@@ -1,0 +1,34 @@
+# Python dependencies cho ứng dụng Quản Lý Quân Nhân
+
+# GUI Framework
+# Tkinter là built-in, không cần cài
+
+# Database
+# SQLite là built-in
+
+# Đọc file Office
+python-docx>=1.1.0
+openpyxl>=3.1.2
+xlrd>=2.0.1  # Cho file .xls cũ
+
+# Xử lý dữ liệu
+pandas>=2.1.0
+
+# Biểu đồ và visualization
+matplotlib>=3.7.0
+
+# Xuất file
+reportlab>=4.0.0  # PDF
+
+# Utilities
+python-dateutil>=2.8.2
+
+# Build exe
+pyinstaller>=6.0.0
+
+# Bảo mật
+cryptography>=41.0.0
+bcrypt>=4.0.0
+
+# Image processing
+Pillow>=10.0.0

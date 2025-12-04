@@ -1,0 +1,52 @@
+═══════════════════════════════════════════════════════════════
+    ỨNG DỤNG QUẢN LÝ HỒ SƠ QUÂN NHÂN
+═══════════════════════════════════════════════════════════════
+
+📦 CÀI ĐẶT:
+1. Giải nén file ZIP
+2. Double-click vào file QuanLyQuanNhan.exe để chạy
+3. Không cần cài đặt Python hay bất kỳ phần mềm nào khác
+
+🔐 ĐĂNG NHẬP:
+- Username: admin
+- Password: admin123
+
+⚠️ LƯU Ý: Đổi mật khẩu ngay sau lần đăng nhập đầu tiên!
+
+✨ TÍNH NĂNG:
+- Quản lý hồ sơ quân nhân (Thêm, Sửa, Xóa, Tìm kiếm)
+- Xem thống kê và báo cáo tổng hợp
+- Xuất dữ liệu ra CSV/PDF
+- Nhập dữ liệu từ file Word/Excel
+- Bảo mật với authentication và encryption
+
+💡 HƯỚNG DẪN SỬ DỤNG:
+1. Đăng nhập với tài khoản admin
+2. Chọn "Danh Sách" để xem danh sách quân nhân
+3. Chọn "Thêm Quân Nhân" để thêm mới
+4. Sử dụng thanh tìm kiếm để tìm kiếm quân nhân
+5. Click đúp vào một quân nhân để chỉnh sửa
+
+📊 XUẤT DỮ LIỆU:
+- Menu "File" > "Xuất CSV..." để xuất ra file CSV
+- Menu "File" > "Xuất PDF..." để xuất ra file PDF
+
+📥 NHẬP DỮ LIỆU:
+- Menu "Quản Lý" > "Nhập Dữ Liệu"
+- Chọn thư mục chứa file Word/Excel
+- Click "Đọc File" và "Import Tất Cả"
+
+🛠️ YÊU CẦU HỆ THỐNG:
+- Windows 7 trở lên
+- Không cần cài đặt thêm phần mềm nào
+
+❓ HỖ TRỢ:
+Nếu gặp vấn đề khi chạy ứng dụng:
+- Đảm bảo Windows Defender không chặn file
+- Click "More info" > "Run anyway" nếu Windows cảnh báo
+- Lần đầu chạy có thể hơi chậm do Windows quét file
+
+═══════════════════════════════════════════════════════════════
+                    Chúc bạn sử dụng tốt!
+═══════════════════════════════════════════════════════════════
+
