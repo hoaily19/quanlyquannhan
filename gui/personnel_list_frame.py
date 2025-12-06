@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import sys
 from pathlib import Path
+from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -190,6 +191,15 @@ class PersonnelListFrame(tk.Frame):
             **common_btn_opts,
         )
         export_btn.pack(side=tk.LEFT, padx=4)
+        
+        export_word_btn = tk.Button(
+            btn_frame,
+            text="📄 Xuất Word",
+            command=self.export_word,
+            **get_button_style('secondary'),
+            **common_btn_opts,
+        )
+        export_word_btn.pack(side=tk.LEFT, padx=4)
         
         # Treeview với border đẹp hơn
         tree_frame = tk.Frame(self, bg='#FFFFFF', relief=tk.SOLID, bd=1)
@@ -1104,3 +1114,134 @@ class PersonnelListFrame(tk.Frame):
                 messagebox.showinfo("Thành công", f"Đã xuất file:\n{file_path}")
             except Exception as e:
                 messagebox.showerror("Lỗi", f"Không thể xuất file:\n{str(e)}")
+    
+    def export_word(self):
+        """Xuất Word với bản xem trước"""
+        # Lọc theo dân tộc thiểu số
+        filtered_list = ExportService.filter_ethnic_minority(self.personnel_list)
+        
+        if not filtered_list:
+            messagebox.showinfo("Thông báo", "Không có quân nhân nào là người đồng bào dân tộc thiểu số")
+            return
+        
+        # Dialog nhập thông tin
+        dialog = tk.Toplevel(self)
+        dialog.title("Xuất file Word - Danh sách dân tộc thiểu số")
+        dialog.geometry("500x400")
+        dialog.configure(bg='#FAFAFA')
+        
+        tk.Label(
+            dialog,
+            text="📄 XUẤT FILE WORD",
+            font=('Arial', 14, 'bold'),
+            bg='#FAFAFA',
+            fg='#388E3C'
+        ).pack(pady=10)
+        
+        # Form nhập thông tin
+        form_frame = tk.Frame(dialog, bg='#FAFAFA')
+        form_frame.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
+        
+        tk.Label(form_frame, text="Tiểu đoàn:", bg='#FAFAFA', font=('Arial', 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
+        tieu_doan_var = tk.StringVar(value="TIỂU ĐOÀN 38")
+        tk.Entry(form_frame, textvariable=tieu_doan_var, width=30, font=('Arial', 10)).grid(row=0, column=1, pady=5, padx=10)
+        
+        tk.Label(form_frame, text="Đại đội:", bg='#FAFAFA', font=('Arial', 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
+        dai_doi_var = tk.StringVar(value="ĐẠI ĐỘI 3")
+        tk.Entry(form_frame, textvariable=dai_doi_var, width=30, font=('Arial', 10)).grid(row=1, column=1, pady=5, padx=10)
+        
+        tk.Label(form_frame, text="Địa điểm:", bg='#FAFAFA', font=('Arial', 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
+        dia_diem_var = tk.StringVar(value="Đắk Lắk")
+        tk.Entry(form_frame, textvariable=dia_diem_var, width=30, font=('Arial', 10)).grid(row=2, column=1, pady=5, padx=10)
+        
+        tk.Label(form_frame, text="Chính trị viên:", bg='#FAFAFA', font=('Arial', 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
+        chinh_tri_vien_var = tk.StringVar()
+        tk.Entry(form_frame, textvariable=chinh_tri_vien_var, width=30, font=('Arial', 10)).grid(row=3, column=1, pady=5, padx=10)
+        
+        # Thông tin xem trước
+        preview_frame = tk.Frame(dialog, bg='#FFFFFF', relief=tk.SOLID, bd=1)
+        preview_frame.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
+        
+        tk.Label(
+            preview_frame,
+            text=f"📊 Xem trước:\nSố lượng quân nhân: {len(filtered_list)}",
+            bg='#FFFFFF',
+            font=('Arial', 10),
+            justify=tk.LEFT
+        ).pack(padx=10, pady=10, anchor=tk.W)
+        
+        # Danh sách dân tộc (lấy từ database, loại trừ Kinh)
+        ethnic_list = {}
+        for person in filtered_list:
+            dan_toc = (person.danToc or '').strip()
+            if dan_toc and dan_toc.lower() not in ['kinh', 'việt', 'việt nam']:
+                ethnic_list[dan_toc] = ethnic_list.get(dan_toc, 0) + 1
+        
+        ethnic_text = "Dân tộc trong danh sách:\n"
+        if ethnic_list:
+            for ethnic, count in sorted(ethnic_list.items()):
+                ethnic_text += f"  • {ethnic}: {count}\n"
+        else:
+            ethnic_text += "  (Chưa có dữ liệu)"
+        
+        tk.Label(
+            preview_frame,
+            text=ethnic_text,
+            bg='#FFFFFF',
+            font=('Arial', 9),
+            justify=tk.LEFT
+        ).pack(padx=10, pady=5, anchor=tk.W)
+        
+        def do_export():
+            try:
+                file_path = filedialog.asksaveasfilename(
+                    defaultextension=".docx",
+                    filetypes=[("Word files", "*.docx"), ("All files", "*.*")],
+                    title="Lưu file Word",
+                    initialfile=f"Danh_sach_dan_toc_thieu_so_{datetime.now().strftime('%Y%m%d')}.docx"
+                )
+                
+                if file_path:
+                    word_data = ExportService.to_word_docx(
+                        filtered_list,
+                        tieu_doan_var.get(),
+                        dai_doi_var.get(),
+                        dia_diem_var.get(),
+                        chinh_tri_vien_var.get()
+                    )
+                    
+                    with open(file_path, 'wb') as f:
+                        f.write(word_data)
+                    
+                    messagebox.showinfo("Thành công", f"Đã xuất file:\n{file_path}\n\nSố lượng: {len(filtered_list)} quân nhân")
+                    dialog.destroy()
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"Không thể xuất file:\n{str(e)}")
+        
+        # Nút xuất
+        btn_frame = tk.Frame(dialog, bg='#FAFAFA')
+        btn_frame.pack(pady=10)
+        
+        tk.Button(
+            btn_frame,
+            text="📄 Xuất File",
+            command=do_export,
+            bg='#4CAF50',
+            fg='white',
+            font=('Arial', 11, 'bold'),
+            padx=20,
+            pady=5,
+            cursor='hand2'
+        ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            btn_frame,
+            text="Hủy",
+            command=dialog.destroy,
+            bg='#CCCCCC',
+            fg='black',
+            font=('Arial', 11),
+            padx=20,
+            pady=5,
+            cursor='hand2'
+        ).pack(side=tk.LEFT, padx=5)

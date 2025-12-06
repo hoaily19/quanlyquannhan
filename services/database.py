@@ -59,6 +59,7 @@ class DatabaseService:
         
         # Thêm các cột mới nếu chưa có (migration)
         self._migrate_personnel_table(cursor)
+        conn.commit()  # Commit migration ngay lập tức
         
         # Tạo bảng units
         cursor.execute("""
@@ -91,6 +92,90 @@ class DatabaseService:
             )
         """)
         
+        # Tạo bảng ban_chap_hanh_chi_doan
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ban_chap_hanh_chi_doan (
+                id TEXT PRIMARY KEY,
+                personnelId TEXT NOT NULL,
+                chucVuDoan TEXT,
+                createdAt TEXT,
+                updatedAt TEXT,
+                UNIQUE(personnelId)
+            )
+        """)
+        
+        # Tạo bảng bao_ve_an_ninh
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS bao_ve_an_ninh (
+                id TEXT PRIMARY KEY,
+                personnelId TEXT NOT NULL,
+                thoiGianVao TEXT,
+                thoiGianRa TEXT,
+                createdAt TEXT,
+                updatedAt TEXT,
+                UNIQUE(personnelId)
+            )
+        """)
+        
+        # Tạo bảng nguoi_than_che_do_cu (quân nhân có người thân tham gia chế độ cũ)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS nguoi_than_che_do_cu (
+                id TEXT PRIMARY KEY,
+                personnelId TEXT NOT NULL,
+                createdAt TEXT,
+                updatedAt TEXT,
+                UNIQUE(personnelId)
+            )
+        """)
+        
+        # Tạo bảng to_dan_van (quân nhân trong tổ công tác dân vận)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS to_dan_van (
+                id TEXT PRIMARY KEY,
+                personnelId TEXT NOT NULL UNIQUE,
+                ghiChu TEXT,
+                createdAt TEXT,
+                updatedAt TEXT
+            )
+        """)
+        
+        # Tạo bảng dang_vien_dien_tap (đảng viên tham gia diễn tập)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dang_vien_dien_tap (
+                id TEXT PRIMARY KEY,
+                personnelId TEXT NOT NULL UNIQUE,
+                ghiChu TEXT,
+                createdAt TEXT,
+                updatedAt TEXT
+            )
+        """)
+        
+        # Tạo bảng nguoi_than_dang_phai_phan_dong (quân nhân có người thân tham gia đảng phái phản động)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS nguoi_than_dang_phai_phan_dong (
+                id TEXT PRIMARY KEY,
+                personnelId TEXT NOT NULL UNIQUE,
+                createdAt TEXT,
+                updatedAt TEXT
+            )
+        """)
+        
+        # Migration: thêm cột ghiChu vào các bảng nếu chưa có
+        try:
+            cursor.execute("ALTER TABLE to_dan_van ADD COLUMN ghiChu TEXT")
+        except sqlite3.OperationalError:
+            pass  # Cột đã tồn tại
+        
+        try:
+            cursor.execute("ALTER TABLE dang_vien_dien_tap ADD COLUMN ghiChu TEXT")
+        except sqlite3.OperationalError:
+            pass  # Cột đã tồn tại
+        
+        try:
+            cursor.execute("ALTER TABLE nguoi_than_che_do_cu ADD COLUMN ghiChu TEXT")
+        except sqlite3.OperationalError:
+            pass  # Cột đã tồn tại
+        
         conn.commit()
         conn.close()
     
@@ -112,6 +197,12 @@ class DatabaseService:
             'nganhHoc': 'TEXT',
             'capHoc': 'TEXT',
             'thoiGianDaoTao': 'TEXT',
+            'ketQuaDaoTao': 'TEXT',
+            'chucVuChienDau': 'TEXT',
+            'thoiGianChucVuChienDau': 'TEXT',
+            'chucVuDaQua': 'TEXT',
+            'thoiGianChucVuDaQua': 'TEXT',
+            'cmQuan': 'TEXT',
             'lienHeKhiCan': 'TEXT',
             'soDienThoaiLienHe': 'TEXT',
             'hoTenCha': 'TEXT',
@@ -121,6 +212,12 @@ class DatabaseService:
             'moiQuanHe': 'TEXT',
             'noiDungNguoiThan': 'TEXT',
             'ghiChu': 'TEXT',
+            'thamGiaNguyQuan': 'TEXT',
+            'thamGiaNguyQuyen': 'TEXT',
+            'thamGiaNoMau': 'TEXT',
+            'daCaiTao': 'TEXT',
+            'ngoaiNgu': 'TEXT',
+            'tiengDTTS': 'TEXT',
         }
         
         # Thêm các cột chưa có
@@ -128,8 +225,10 @@ class DatabaseService:
             if col_name not in existing_columns:
                 try:
                     cursor.execute(f"ALTER TABLE personnel ADD COLUMN {col_name} {col_type}")
-                except sqlite3.OperationalError:
-                    pass  # Cột đã tồn tại
+                    print(f"Đã thêm cột {col_name} vào bảng personnel")
+                except sqlite3.OperationalError as e:
+                    print(f"Lỗi khi thêm cột {col_name}: {e}")
+                    pass  # Cột đã tồn tại hoặc lỗi khác
     
     def get_all(self) -> List[Personnel]:
         """Lấy tất cả quân nhân"""
@@ -189,11 +288,13 @@ class DatabaseService:
             'id', 'hoTen', 'hoTenThuongDung', 'ngaySinh', 'capBac', 'ngayNhanCapBac',
             'chucVu', 'ngayNhanChucVu', 'donVi', 'unitId', 'nhapNgu', 'xuatNgu',
             'queQuan', 'truQuan', 'danToc', 'tonGiao', 'trinhDoVanHoa', 'thanhPhanGiaDinh',
-            'quaTruong', 'nganhHoc', 'capHoc', 'thoiGianDaoTao',
+            'quaTruong', 'nganhHoc', 'capHoc', 'thoiGianDaoTao', 'ketQuaDaoTao',
+            'chucVuChienDau', 'thoiGianChucVuChienDau', 'chucVuDaQua', 'thoiGianChucVuDaQua', 'cmQuan',
             'lienHeKhiCan', 'soDienThoaiLienHe',
             'hoTenCha', 'hoTenMe', 'hoTenVo',
             'hoTenNguoiThan', 'moiQuanHe', 'noiDungNguoiThan',
-            'ghiChu', 'thongTinKhac', 'createdAt', 'updatedAt',
+            'thamGiaNguyQuan', 'thamGiaNguyQuyen', 'thamGiaNoMau', 'daCaiTao',
+            'ghiChu', 'ngoaiNgu', 'tiengDTTS', 'thongTinKhac', 'createdAt', 'updatedAt',
         ]
 
         placeholders = ", ".join(["?"] * len(columns))
@@ -221,6 +322,12 @@ class DatabaseService:
             data.get('nganhHoc', ''),
             data.get('capHoc', ''),
             data.get('thoiGianDaoTao', ''),
+            data.get('ketQuaDaoTao', ''),
+            data.get('chucVuChienDau', ''),
+            data.get('thoiGianChucVuChienDau', ''),
+            data.get('chucVuDaQua', ''),
+            data.get('thoiGianChucVuDaQua', ''),
+            data.get('cmQuan', ''),
             data.get('lienHeKhiCan', ''),
             data.get('soDienThoaiLienHe', ''),
             data.get('hoTenCha', ''),
@@ -229,7 +336,13 @@ class DatabaseService:
             data.get('hoTenNguoiThan', ''),
             data.get('moiQuanHe', ''),
             data.get('noiDungNguoiThan', ''),
+            data.get('thamGiaNguyQuan', ''),
+            data.get('thamGiaNguyQuyen', ''),
+            data.get('thamGiaNoMau', ''),
+            data.get('daCaiTao', ''),
             data.get('ghiChu', ''),
+            data.get('ngoaiNgu', ''),
+            data.get('tiengDTTS', ''),
             json.dumps(data['thongTinKhac']),
             data['createdAt'],
             data['updatedAt'],
@@ -259,11 +372,13 @@ class DatabaseService:
                 chucVu = ?, ngayNhanChucVu = ?, donVi = ?, unitId = ?,
                 nhapNgu = ?, xuatNgu = ?, queQuan = ?, truQuan = ?,
                 danToc = ?, tonGiao = ?, trinhDoVanHoa = ?, thanhPhanGiaDinh = ?,
-                quaTruong = ?, nganhHoc = ?, capHoc = ?, thoiGianDaoTao = ?,
+                quaTruong = ?, nganhHoc = ?, capHoc = ?, thoiGianDaoTao = ?, ketQuaDaoTao = ?,
+                chucVuChienDau = ?, thoiGianChucVuChienDau = ?, chucVuDaQua = ?, thoiGianChucVuDaQua = ?, cmQuan = ?,
                 lienHeKhiCan = ?, soDienThoaiLienHe = ?,
                 hoTenCha = ?, hoTenMe = ?, hoTenVo = ?,
                 hoTenNguoiThan = ?, moiQuanHe = ?, noiDungNguoiThan = ?,
-                ghiChu = ?, thongTinKhac = ?, updatedAt = ?
+                thamGiaNguyQuan = ?, thamGiaNguyQuyen = ?, thamGiaNoMau = ?, daCaiTao = ?,
+                ghiChu = ?, ngoaiNgu = ?, tiengDTTS = ?, thongTinKhac = ?, updatedAt = ?
             WHERE id = ?
         """, (
             data['hoTen'],
@@ -287,6 +402,12 @@ class DatabaseService:
             data.get('nganhHoc', ''),
             data.get('capHoc', ''),
             data.get('thoiGianDaoTao', ''),
+            data.get('ketQuaDaoTao', ''),
+            data.get('chucVuChienDau', ''),
+            data.get('thoiGianChucVuChienDau', ''),
+            data.get('chucVuDaQua', ''),
+            data.get('thoiGianChucVuDaQua', ''),
+            data.get('cmQuan', ''),
             data.get('lienHeKhiCan', ''),
             data.get('soDienThoaiLienHe', ''),
             data.get('hoTenCha', ''),
@@ -295,7 +416,13 @@ class DatabaseService:
             data.get('hoTenNguoiThan', ''),
             data.get('moiQuanHe', ''),
             data.get('noiDungNguoiThan', ''),
+            data.get('thamGiaNguyQuan', ''),
+            data.get('thamGiaNguyQuyen', ''),
+            data.get('thamGiaNoMau', ''),
+            data.get('daCaiTao', ''),
             data.get('ghiChu', ''),
+            data.get('ngoaiNgu', ''),
+            data.get('tiengDTTS', ''),
             json.dumps(data['thongTinKhac']),
             data['updatedAt'],
             data['id'],
@@ -366,6 +493,8 @@ class DatabaseService:
     def get_all_units(self):
         """Lấy tất cả đơn vị"""
         try:
+            from models.unit import Unit
+            
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -381,7 +510,7 @@ class DatabaseService:
                     data['personnelIds'] = json.loads(data['personnelIds'])
                 else:
                     data['personnelIds'] = []
-                result.append(data)
+                result.append(Unit.from_dict(data))
             
             return result
         except sqlite3.OperationalError:
@@ -391,6 +520,8 @@ class DatabaseService:
     def get_unit_by_id(self, unit_id: str):
         """Lấy đơn vị theo ID"""
         try:
+            from models.unit import Unit
+            
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -408,9 +539,35 @@ class DatabaseService:
             else:
                 data['personnelIds'] = []
             
-            return data
+            return Unit.from_dict(data)
         except sqlite3.OperationalError:
             return None
+    
+    def get_units_by_parent_id(self, parent_id: str):
+        """Lấy danh sách đơn vị con theo parent ID"""
+        try:
+            from models.unit import Unit
+            
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT * FROM units WHERE parentId = ? ORDER BY ten", (parent_id,))
+            rows = cursor.fetchall()
+            conn.close()
+            
+            result = []
+            for row in rows:
+                data = dict(row)
+                if data.get('personnelIds'):
+                    data['personnelIds'] = json.loads(data['personnelIds'])
+                else:
+                    data['personnelIds'] = []
+                result.append(Unit.from_dict(data))
+            
+            return result
+        except sqlite3.OperationalError:
+            return []
     
     def create_unit(self, unit) -> str:
         """Tạo đơn vị mới"""
@@ -632,3 +789,481 @@ class DatabaseService:
         conn.close()
         
         return success
+    
+    def get_ban_chap_hanh_chi_doan(self) -> List[str]:
+        """Lấy danh sách ID quân nhân trong ban chấp hành chi đoàn"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT personnelId FROM ban_chap_hanh_chi_doan")
+            rows = cursor.fetchall()
+            conn.close()
+            return [row[0] for row in rows]
+        except Exception:
+            return []
+    
+    def add_ban_chap_hanh_chi_doan(self, personnel_id: str, chuc_vu_doan: str = "") -> bool:
+        """Thêm quân nhân vào ban chấp hành chi đoàn"""
+        try:
+            import uuid
+            from datetime import datetime
+            
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Kiểm tra xem đã có chưa
+            cursor.execute("SELECT id FROM ban_chap_hanh_chi_doan WHERE personnelId = ?", (personnel_id,))
+            existing = cursor.fetchone()
+            
+            if existing:
+                # Cập nhật
+                cursor.execute("""
+                    UPDATE ban_chap_hanh_chi_doan 
+                    SET chucVuDoan = ?, updatedAt = ?
+                    WHERE personnelId = ?
+                """, (chuc_vu_doan, datetime.now().isoformat(), personnel_id))
+            else:
+                # Thêm mới
+                ban_chap_hanh_id = str(uuid.uuid4())
+                cursor.execute("""
+                    INSERT INTO ban_chap_hanh_chi_doan (id, personnelId, chucVuDoan, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (ban_chap_hanh_id, personnel_id, chuc_vu_doan, 
+                      datetime.now().isoformat(), datetime.now().isoformat()))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error adding ban chap hanh: {e}")
+            return False
+    
+    def remove_ban_chap_hanh_chi_doan(self, personnel_id: str) -> bool:
+        """Xóa quân nhân khỏi ban chấp hành chi đoàn"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM ban_chap_hanh_chi_doan WHERE personnelId = ?", (personnel_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            return False
+    
+    def get_chuc_vu_doan(self, personnel_id: str) -> str:
+        """Lấy chức vụ đoàn của quân nhân trong ban chấp hành"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT chucVuDoan FROM ban_chap_hanh_chi_doan WHERE personnelId = ?", (personnel_id,))
+            row = cursor.fetchone()
+            conn.close()
+            return row[0] if row and row[0] else ""
+        except Exception:
+            return ""
+    
+    def get_bao_ve_an_ninh(self) -> List[str]:
+        """Lấy danh sách ID quân nhân trong bảo vệ an ninh"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT personnelId FROM bao_ve_an_ninh")
+            rows = cursor.fetchall()
+            conn.close()
+            return [row[0] for row in rows]
+        except Exception:
+            return []
+    
+    def add_bao_ve_an_ninh(self, personnel_id: str, thoi_gian_vao: str = "", thoi_gian_ra: str = "") -> bool:
+        """Thêm quân nhân vào bảo vệ an ninh"""
+        try:
+            import uuid
+            from datetime import datetime
+            
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Kiểm tra xem đã có chưa
+            cursor.execute("SELECT id FROM bao_ve_an_ninh WHERE personnelId = ?", (personnel_id,))
+            existing = cursor.fetchone()
+            
+            if existing:
+                # Cập nhật
+                cursor.execute("""
+                    UPDATE bao_ve_an_ninh 
+                    SET thoiGianVao = ?, thoiGianRa = ?, updatedAt = ?
+                    WHERE personnelId = ?
+                """, (thoi_gian_vao, thoi_gian_ra, datetime.now().isoformat(), personnel_id))
+            else:
+                # Thêm mới
+                bao_ve_id = str(uuid.uuid4())
+                cursor.execute("""
+                    INSERT INTO bao_ve_an_ninh (id, personnelId, thoiGianVao, thoiGianRa, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (bao_ve_id, personnel_id, thoi_gian_vao, thoi_gian_ra, 
+                      datetime.now().isoformat(), datetime.now().isoformat()))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error adding bao ve an ninh: {e}")
+            return False
+    
+    def remove_bao_ve_an_ninh(self, personnel_id: str) -> bool:
+        """Xóa quân nhân khỏi bảo vệ an ninh"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM bao_ve_an_ninh WHERE personnelId = ?", (personnel_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            return False
+    
+    # ========== Nguoi Than Che Do Cu Management ==========
+    
+    def get_nguoi_than_che_do_cu(self) -> List[str]:
+        """Lấy danh sách ID quân nhân có người thân tham gia chế độ cũ"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT personnelId FROM nguoi_than_che_do_cu")
+            result = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            return result
+        except Exception:
+            return []
+    
+    def add_nguoi_than_che_do_cu(self, personnel_id: str) -> bool:
+        """Thêm quân nhân vào danh sách có người thân tham gia chế độ cũ"""
+        try:
+            import uuid
+            from datetime import datetime
+            
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Kiểm tra xem đã có chưa
+            cursor.execute("SELECT id FROM nguoi_than_che_do_cu WHERE personnelId = ?", (personnel_id,))
+            existing = cursor.fetchone()
+            
+            if existing:
+                # Cập nhật
+                cursor.execute("""
+                    UPDATE nguoi_than_che_do_cu 
+                    SET updatedAt = ?
+                    WHERE personnelId = ?
+                """, (datetime.now().isoformat(), personnel_id))
+            else:
+                # Thêm mới
+                record_id = str(uuid.uuid4())
+                cursor.execute("""
+                    INSERT INTO nguoi_than_che_do_cu (id, personnelId, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?)
+                """, (record_id, personnel_id, 
+                      datetime.now().isoformat(), datetime.now().isoformat()))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error adding nguoi than che do cu: {e}")
+            return False
+    
+    def remove_nguoi_than_che_do_cu(self, personnel_id: str) -> bool:
+        """Xóa quân nhân khỏi danh sách có người thân tham gia chế độ cũ"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM nguoi_than_che_do_cu WHERE personnelId = ?", (personnel_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            return False
+    
+    def get_nguoi_than_che_do_cu_ghi_chu(self, personnel_id: str) -> str:
+        """Lấy ghi chú riêng của quân nhân trong người thân chế độ cũ"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT ghiChu FROM nguoi_than_che_do_cu WHERE personnelId = ?", (personnel_id,))
+            row = cursor.fetchone()
+            conn.close()
+            return row[0] if row and row[0] else ''
+        except Exception:
+            return ''
+    
+    def update_nguoi_than_che_do_cu_ghi_chu(self, personnel_id: str, ghi_chu: str) -> bool:
+        """Cập nhật ghi chú riêng của quân nhân trong người thân chế độ cũ"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE nguoi_than_che_do_cu 
+                SET ghiChu = ?, updatedAt = ?
+                WHERE personnelId = ?
+            """, (ghi_chu, datetime.now().isoformat(), personnel_id))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            return False
+    
+    # ========== To Dan Van Management ==========
+    
+    def get_to_dan_van(self) -> List[str]:
+        """Lấy danh sách ID quân nhân trong tổ công tác dân vận"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT personnelId FROM to_dan_van")
+            result = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            return result
+        except Exception:
+            return []
+    
+    def get_to_dan_van_ghi_chu(self, personnel_id: str) -> str:
+        """Lấy ghi chú riêng của quân nhân trong tổ công tác dân vận"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT ghiChu FROM to_dan_van WHERE personnelId = ?", (personnel_id,))
+            row = cursor.fetchone()
+            conn.close()
+            return row[0] if row and row[0] else ''
+        except Exception:
+            return ''
+    
+    def update_to_dan_van_ghi_chu(self, personnel_id: str, ghi_chu: str) -> bool:
+        """Cập nhật ghi chú riêng của quân nhân trong tổ công tác dân vận"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE to_dan_van 
+                SET ghiChu = ?, updatedAt = ?
+                WHERE personnelId = ?
+            """, (ghi_chu, datetime.now().isoformat(), personnel_id))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            return False
+    
+    def add_to_dan_van(self, personnel_id: str) -> bool:
+        """Thêm quân nhân vào tổ công tác dân vận"""
+        try:
+            import uuid
+            from datetime import datetime
+            
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Kiểm tra xem đã có chưa
+            cursor.execute("SELECT id FROM to_dan_van WHERE personnelId = ?", (personnel_id,))
+            existing = cursor.fetchone()
+            
+            if existing:
+                # Cập nhật
+                cursor.execute("""
+                    UPDATE to_dan_van 
+                    SET updatedAt = ?
+                    WHERE personnelId = ?
+                """, (datetime.now().isoformat(), personnel_id))
+            else:
+                # Thêm mới
+                record_id = str(uuid.uuid4())
+                cursor.execute("""
+                    INSERT INTO to_dan_van (id, personnelId, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?)
+                """, (record_id, personnel_id, 
+                      datetime.now().isoformat(), datetime.now().isoformat()))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error adding to dan van: {e}")
+            return False
+    
+    def remove_to_dan_van(self, personnel_id: str) -> bool:
+        """Xóa quân nhân khỏi tổ công tác dân vận"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM to_dan_van WHERE personnelId = ?", (personnel_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            return False
+    
+    # ========== Dang Vien Dien Tap Management ==========
+    
+    def get_dang_vien_dien_tap(self) -> List[str]:
+        """Lấy danh sách ID quân nhân đảng viên tham gia diễn tập"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT personnelId FROM dang_vien_dien_tap")
+            result = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            return result
+        except Exception:
+            return []
+    
+    def get_dang_vien_dien_tap_ghi_chu(self, personnel_id: str) -> str:
+        """Lấy ghi chú riêng của quân nhân trong đảng viên diễn tập"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT ghiChu FROM dang_vien_dien_tap WHERE personnelId = ?", (personnel_id,))
+            row = cursor.fetchone()
+            conn.close()
+            return row[0] if row and row[0] else ''
+        except Exception:
+            return ''
+    
+    def update_dang_vien_dien_tap_ghi_chu(self, personnel_id: str, ghi_chu: str) -> bool:
+        """Cập nhật ghi chú riêng của quân nhân trong đảng viên diễn tập"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE dang_vien_dien_tap 
+                SET ghiChu = ?, updatedAt = ?
+                WHERE personnelId = ?
+            """, (ghi_chu, datetime.now().isoformat(), personnel_id))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            return False
+    
+    def add_dang_vien_dien_tap(self, personnel_id: str) -> bool:
+        """Thêm quân nhân vào danh sách đảng viên tham gia diễn tập"""
+        try:
+            import uuid
+            from datetime import datetime
+            
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Kiểm tra xem đã có chưa
+            cursor.execute("SELECT id FROM dang_vien_dien_tap WHERE personnelId = ?", (personnel_id,))
+            existing = cursor.fetchone()
+            
+            if existing:
+                # Cập nhật
+                cursor.execute("""
+                    UPDATE dang_vien_dien_tap 
+                    SET updatedAt = ?
+                    WHERE personnelId = ?
+                """, (datetime.now().isoformat(), personnel_id))
+            else:
+                # Thêm mới
+                record_id = str(uuid.uuid4())
+                cursor.execute("""
+                    INSERT INTO dang_vien_dien_tap (id, personnelId, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?)
+                """, (record_id, personnel_id, 
+                      datetime.now().isoformat(), datetime.now().isoformat()))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error adding dang vien dien tap: {e}")
+            return False
+    
+    def remove_dang_vien_dien_tap(self, personnel_id: str) -> bool:
+        """Xóa quân nhân khỏi danh sách đảng viên tham gia diễn tập"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM dang_vien_dien_tap WHERE personnelId = ?", (personnel_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            return False
+    
+    # ========== Nguoi Than Dang Phai Phan Dong Management ==========
+    
+    def get_nguoi_than_dang_phai_phan_dong(self) -> List[str]:
+        """Lấy danh sách ID quân nhân có người thân tham gia đảng phái phản động"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT personnelId FROM nguoi_than_dang_phai_phan_dong")
+            result = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            return result
+        except Exception:
+            return []
+    
+    def add_nguoi_than_dang_phai_phan_dong(self, personnel_id: str) -> bool:
+        """Thêm quân nhân vào danh sách có người thân tham gia đảng phái phản động"""
+        try:
+            import uuid
+            from datetime import datetime
+            
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Kiểm tra xem đã có chưa
+            cursor.execute("SELECT id FROM nguoi_than_dang_phai_phan_dong WHERE personnelId = ?", (personnel_id,))
+            existing = cursor.fetchone()
+            
+            if existing:
+                # Cập nhật
+                cursor.execute("""
+                    UPDATE nguoi_than_dang_phai_phan_dong 
+                    SET updatedAt = ?
+                    WHERE personnelId = ?
+                """, (datetime.now().isoformat(), personnel_id))
+            else:
+                # Thêm mới
+                record_id = str(uuid.uuid4())
+                cursor.execute("""
+                    INSERT INTO nguoi_than_dang_phai_phan_dong (id, personnelId, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?)
+                """, (record_id, personnel_id, 
+                      datetime.now().isoformat(), datetime.now().isoformat()))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error adding nguoi than dang phai phan dong: {e}")
+            return False
+    
+    def remove_nguoi_than_dang_phai_phan_dong(self, personnel_id: str) -> bool:
+        """Xóa quân nhân khỏi danh sách có người thân tham gia đảng phái phản động"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM nguoi_than_dang_phai_phan_dong WHERE personnelId = ?", (personnel_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            return False
+    
+    def get_bao_ve_an_ninh_info(self, personnel_id: str) -> dict:
+        """Lấy thông tin bảo vệ an ninh của quân nhân"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT thoiGianVao, thoiGianRa FROM bao_ve_an_ninh WHERE personnelId = ?", (personnel_id,))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                return {'thoiGianVao': row[0] or '', 'thoiGianRa': row[1] or ''}
+            return {'thoiGianVao': '', 'thoiGianRa': ''}
+        except Exception:
+            return {'thoiGianVao': '', 'thoiGianRa': ''}

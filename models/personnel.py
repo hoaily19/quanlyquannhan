@@ -32,6 +32,7 @@ class ThongTinKhac:
     noiDungYeuToNN: str = ""  # Nội dung yếu tố nước ngoài
     moiQuanHeYeuToNN: str = ""  # Mối quan hệ (Bố, Mẹ, Anh, Em...)
     tenNuoc: str = ""  # Tên nước
+    dangPhaiPhanDong: bool = False  # Tham gia đảng phái phản động
 
 
 @dataclass
@@ -60,6 +61,14 @@ class Personnel:
     nganhHoc: str = ""  # Ngành học
     capHoc: str = ""  # Cấp học
     thoiGianDaoTao: str = ""  # Thời gian đào tạo
+    ketQuaDaoTao: str = ""  # Kết quả đào tạo
+    # Thông tin chức vụ chiến đấu
+    chucVuChienDau: str = ""  # Chức vụ chiến đấu
+    thoiGianChucVuChienDau: str = ""  # Thời gian chức vụ chiến đấu
+    chucVuDaQua: str = ""  # Chức vụ đã qua
+    thoiGianChucVuDaQua: str = ""  # Thời gian chức vụ đã qua
+    # CM Quân
+    cmQuan: str = ""  # CM Quân (Tháng năm) - có thể dùng nhapNgu nhưng thêm field riêng
     # Thông tin liên hệ
     lienHeKhiCan: str = ""  # Khi cần báo tin cho ai
     soDienThoaiLienHe: str = ""  # SĐT liên hệ
@@ -68,10 +77,17 @@ class Personnel:
     hoTenMe: str = ""
     hoTenVo: str = ""
     ghiChu: str = ""
+    ngoaiNgu: str = ""  # Ngoại ngữ
+    tiengDTTS: str = ""  # Tiếng dân tộc thiểu số
     # Thông tin người thân tham gia đảng phái phản động
     hoTenNguoiThan: str = ""  # Họ tên người thân
     moiQuanHe: str = ""  # Mối quan hệ (Bố, Mẹ, Anh, Em...)
     noiDungNguoiThan: str = ""  # Nội dung người thân tham gia
+    # Thông tin THAM GIA chế độ cũ
+    thamGiaNguyQuan: str = ""  # Ngụy quân (có thể là "X" hoặc "")
+    thamGiaNguyQuyen: str = ""  # Ngụy quyền (có thể là "X" hoặc "")
+    thamGiaNoMau: str = ""  # Nợ máu/không nợ máu
+    daCaiTao: str = ""  # Đã cải tạo/chưa cải tạo
     thongTinKhac: ThongTinKhac = field(default_factory=ThongTinKhac)
     createdAt: Optional[datetime] = None
     updatedAt: Optional[datetime] = None
@@ -101,6 +117,12 @@ class Personnel:
             'nganhHoc': self.nganhHoc,
             'capHoc': self.capHoc,
             'thoiGianDaoTao': self.thoiGianDaoTao,
+            'ketQuaDaoTao': self.ketQuaDaoTao,
+            'chucVuChienDau': self.chucVuChienDau,
+            'thoiGianChucVuChienDau': self.thoiGianChucVuChienDau,
+            'chucVuDaQua': self.chucVuDaQua,
+            'thoiGianChucVuDaQua': self.thoiGianChucVuDaQua,
+            'cmQuan': self.cmQuan,
             'lienHeKhiCan': self.lienHeKhiCan,
             'soDienThoaiLienHe': self.soDienThoaiLienHe,
             'hoTenCha': self.hoTenCha,
@@ -109,7 +131,13 @@ class Personnel:
             'hoTenNguoiThan': self.hoTenNguoiThan,
             'moiQuanHe': self.moiQuanHe,
             'noiDungNguoiThan': self.noiDungNguoiThan,
+            'thamGiaNguyQuan': self.thamGiaNguyQuan,
+            'thamGiaNguyQuyen': self.thamGiaNguyQuyen,
+            'thamGiaNoMau': self.thamGiaNoMau,
+            'daCaiTao': self.daCaiTao,
             'ghiChu': self.ghiChu,
+            'ngoaiNgu': self.ngoaiNgu,
+            'tiengDTTS': self.tiengDTTS,
             'thongTinKhac': {
                 'dang': {
                     'ngayVao': self.thongTinKhac.dang.ngayVao,
@@ -125,6 +153,7 @@ class Personnel:
                 'noiDungYeuToNN': self.thongTinKhac.noiDungYeuToNN,
                 'moiQuanHeYeuToNN': self.thongTinKhac.moiQuanHeYeuToNN,
                 'tenNuoc': self.thongTinKhac.tenNuoc,
+                'dangPhaiPhanDong': self.thongTinKhac.dangPhaiPhanDong,
             },
             'createdAt': self.createdAt.isoformat() if self.createdAt else None,
             'updatedAt': self.updatedAt.isoformat() if self.updatedAt else None,
@@ -150,6 +179,7 @@ class Personnel:
             thong_tin_khac.noiDungYeuToNN = tt.get('noiDungYeuToNN', '')
             thong_tin_khac.moiQuanHeYeuToNN = tt.get('moiQuanHeYeuToNN', '')
             thong_tin_khac.tenNuoc = tt.get('tenNuoc', '')
+            thong_tin_khac.dangPhaiPhanDong = tt.get('dangPhaiPhanDong', False)
 
         return cls(
             id=data.get('id'),
@@ -174,6 +204,12 @@ class Personnel:
             nganhHoc=data.get('nganhHoc', ''),
             capHoc=data.get('capHoc', ''),
             thoiGianDaoTao=data.get('thoiGianDaoTao', ''),
+            ketQuaDaoTao=data.get('ketQuaDaoTao', ''),
+            chucVuChienDau=data.get('chucVuChienDau', ''),
+            thoiGianChucVuChienDau=data.get('thoiGianChucVuChienDau', ''),
+            chucVuDaQua=data.get('chucVuDaQua', ''),
+            thoiGianChucVuDaQua=data.get('thoiGianChucVuDaQua', ''),
+            cmQuan=data.get('cmQuan', ''),
             lienHeKhiCan=data.get('lienHeKhiCan', ''),
             soDienThoaiLienHe=data.get('soDienThoaiLienHe', ''),
             hoTenCha=data.get('hoTenCha', ''),
@@ -182,6 +218,12 @@ class Personnel:
             hoTenNguoiThan=data.get('hoTenNguoiThan', ''),
             moiQuanHe=data.get('moiQuanHe', ''),
             noiDungNguoiThan=data.get('noiDungNguoiThan', ''),
+            thamGiaNguyQuan=data.get('thamGiaNguyQuan', ''),
+            thamGiaNguyQuyen=data.get('thamGiaNguyQuyen', ''),
+            thamGiaNoMau=data.get('thamGiaNoMau', ''),
+            daCaiTao=data.get('daCaiTao', ''),
             ghiChu=data.get('ghiChu', ''),
+            ngoaiNgu=data.get('ngoaiNgu', ''),
+            tiengDTTS=data.get('tiengDTTS', ''),
             thongTinKhac=thong_tin_khac,
         )

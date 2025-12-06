@@ -27,8 +27,9 @@ class App:
     def setup_window(self):
         """Thiết lập cửa sổ chính"""
         self.root.title("🪖 Quản Lý Hồ Sơ Quân Nhân")
-        self.root.geometry("1200x800")
-        self.root.minsize(1000, 600)
+        # Tăng chiều cao để hiển thị nhiều dữ liệu hơn
+        self.root.geometry("1400x1100")
+        self.root.minsize(1200, 800)
         
         # Set background color
         self.root.configure(bg='#ecf0f1')

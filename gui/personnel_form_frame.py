@@ -212,6 +212,8 @@ class PersonnelFormFrame(tk.Frame):
         self.dan_toc_var = self.create_field(right_col, "Dân Tộc", self.personnel.danToc)
         self.ton_giao_var = self.create_field(right_col, "Tôn Giáo", self.personnel.tonGiao)
         self.trinh_do_var = self.create_field(right_col, "Trình Độ Văn Hóa", self.personnel.trinhDoVanHoa)
+        self.ngoai_ngu_var = self.create_field(right_col, "Ngoại Ngữ", self.personnel.ngoaiNgu)
+        self.tieng_dtts_var = self.create_field(right_col, "Tiếng DTTS", self.personnel.tiengDTTS)
         
         # Thông tin học vấn
         self.create_section(parent, "🎓 Thông Tin Học Vấn")
@@ -229,6 +231,40 @@ class PersonnelFormFrame(tk.Frame):
         self.nganh_hoc_var = self.create_field(hoc_van_left, "Ngành Học", self.personnel.nganhHoc)
         self.cap_hoc_var = self.create_field(hoc_van_right, "Cấp Học", self.personnel.capHoc)
         self.thoi_gian_dao_tao_var = self.create_field(hoc_van_right, "Thời Gian Đào Tạo", self.personnel.thoiGianDaoTao)
+        self.ket_qua_dao_tao_var = self.create_field(hoc_van_right, "Kết Quả Đào Tạo", self.personnel.ketQuaDaoTao)
+        
+        # Thông tin chức vụ và thời gian
+        self.create_section(parent, "⚔️ Thông Tin Chức Vụ Chiến Đấu")
+        
+        chuc_vu_container = tk.Frame(parent, bg=self.bg_color)
+        chuc_vu_container.pack(fill=tk.X, padx=25, pady=12)
+        
+        chuc_vu_left = tk.Frame(chuc_vu_container, bg=self.bg_color)
+        chuc_vu_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 15))
+        
+        chuc_vu_right = tk.Frame(chuc_vu_container, bg=self.bg_color)
+        chuc_vu_right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(15, 0))
+        
+        self.chuc_vu_chien_dau_var = self.create_field(chuc_vu_left, "Chức Vụ Chiến Đấu", self.personnel.chucVuChienDau)
+        self.thoi_gian_chuc_vu_chien_dau_var = self.create_field(chuc_vu_left, "Thời Gian Chức Vụ Chiến Đấu", self.personnel.thoiGianChucVuChienDau)
+        self.chuc_vu_da_qua_var = self.create_field(chuc_vu_right, "Chức Vụ Đã Qua", self.personnel.chucVuDaQua)
+        self.thoi_gian_chuc_vu_da_qua_var = self.create_field(chuc_vu_right, "Thời Gian Chức Vụ Đã Qua", self.personnel.thoiGianChucVuDaQua)
+        
+        # Thông tin CM Quân và ngày nhận
+        self.create_section(parent, "📅 Thông Tin Ngày Nhận")
+        
+        ngay_nhan_container = tk.Frame(parent, bg=self.bg_color)
+        ngay_nhan_container.pack(fill=tk.X, padx=25, pady=12)
+        
+        ngay_nhan_left = tk.Frame(ngay_nhan_container, bg=self.bg_color)
+        ngay_nhan_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 15))
+        
+        ngay_nhan_right = tk.Frame(ngay_nhan_container, bg=self.bg_color)
+        ngay_nhan_right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(15, 0))
+        
+        self.ngay_nhan_cap_bac_picker = self.create_date_field(ngay_nhan_left, "Ngày Nhận Cấp Bậc", self.personnel.ngayNhanCapBac)
+        self.ngay_nhan_chuc_vu_picker = self.create_date_field(ngay_nhan_left, "Ngày Nhận Chức Vụ", self.personnel.ngayNhanChucVu)
+        self.cm_quan_picker = self.create_date_field(ngay_nhan_right, "CM Quân (Tháng năm)", self.personnel.cmQuan or self.personnel.nhapNgu)
         
         # Thông tin đảng
         self.create_section(parent, "🏛️ Thông Tin Đảng")
@@ -329,8 +365,118 @@ class PersonnelFormFrame(tk.Frame):
             self.yeu_to_nn_btn.pack(side=tk.LEFT, padx=(15, 0))
             self.yeu_to_nn_btn.pack_forget()
         
-        # Thông tin người thân tham gia đảng phái phản động
-        self.create_section(parent, "⚠️ Thông Tin Người Thân Tham Gia Đảng Phái Phản Động")
+        # Thông tin THAM GIA chế độ cũ
+        self.create_section(parent, "📋 Thông Tin THAM GIA Chế Độ Cũ")
+        
+        tham_gia_container = tk.Frame(parent, bg=self.bg_color)
+        tham_gia_container.pack(fill=tk.X, padx=25, pady=12)
+        
+        tham_gia_left = tk.Frame(tham_gia_container, bg=self.bg_color)
+        tham_gia_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 15))
+        
+        tham_gia_right = tk.Frame(tham_gia_container, bg=self.bg_color)
+        tham_gia_right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(15, 0))
+        
+        # Checkbox Ngụy quân
+        self.tham_gia_nguy_quan_var = tk.BooleanVar(value=bool(self.personnel.thamGiaNguyQuan))
+        nguy_quan_check = tk.Checkbutton(
+            tham_gia_left,
+            text="Ngụy quân",
+            variable=self.tham_gia_nguy_quan_var,
+            font=('Segoe UI', 10),
+            bg=self.bg_color,
+            fg=self.text_color,
+            activebackground=self.bg_color,
+            activeforeground=self.text_color,
+            selectcolor='white'
+        )
+        nguy_quan_check.pack(anchor=tk.W, pady=8)
+        
+        # Checkbox Ngụy quyền
+        self.tham_gia_nguy_quyen_var = tk.BooleanVar(value=bool(self.personnel.thamGiaNguyQuyen))
+        nguy_quyen_check = tk.Checkbutton(
+            tham_gia_left,
+            text="Ngụy quyền",
+            variable=self.tham_gia_nguy_quyen_var,
+            font=('Segoe UI', 10),
+            bg=self.bg_color,
+            fg=self.text_color,
+            activebackground=self.bg_color,
+            activeforeground=self.text_color,
+            selectcolor='white'
+        )
+        nguy_quyen_check.pack(anchor=tk.W, pady=8)
+        
+        # Select Nợ máu/không nợ máu
+        self.tham_gia_no_mau_var = tk.StringVar(value=self.personnel.thamGiaNoMau or '')
+        no_mau_frame = tk.Frame(tham_gia_right, bg=self.bg_color)
+        no_mau_frame.pack(fill=tk.X, pady=10)
+        
+        tk.Label(
+            no_mau_frame,
+            text="Nợ máu/không nợ máu",
+            font=('Segoe UI', 10),
+            width=20,
+            anchor=tk.W,
+            bg=self.bg_color,
+            fg=self.text_color
+        ).pack(side=tk.LEFT, padx=(0, 15))
+        
+        no_mau_combo = ttk.Combobox(
+            no_mau_frame,
+            textvariable=self.tham_gia_no_mau_var,
+            values=['', 'Nợ máu', 'Không nợ máu'],
+            font=('Segoe UI', 10),
+            state='readonly',
+            width=20
+        )
+        no_mau_combo.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Select Đã cải tạo/chưa cải tạo
+        self.da_cai_tao_var = tk.StringVar(value=self.personnel.daCaiTao or '')
+        cai_tao_frame = tk.Frame(tham_gia_right, bg=self.bg_color)
+        cai_tao_frame.pack(fill=tk.X, pady=10)
+        
+        tk.Label(
+            cai_tao_frame,
+            text="Đã cải tạo/chưa cải tạo",
+            font=('Segoe UI', 10),
+            width=20,
+            anchor=tk.W,
+            bg=self.bg_color,
+            fg=self.text_color
+        ).pack(side=tk.LEFT, padx=(0, 15))
+        
+        cai_tao_combo = ttk.Combobox(
+            cai_tao_frame,
+            textvariable=self.da_cai_tao_var,
+            values=['', 'Đã cải tạo', 'Chưa cải tạo'],
+            font=('Segoe UI', 10),
+            state='readonly',
+            width=20
+        )
+        cai_tao_combo.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Thông tin người thân
+        self.create_section(parent, "👥 Thông Tin Người Thân")
+        
+        # Checkbox "Tham gia đảng phái phản động"
+        dang_phai_frame = tk.Frame(parent, bg=self.bg_color)
+        dang_phai_frame.pack(fill=tk.X, padx=25, pady=10)
+        
+        self.dang_phai_phan_dong_var = tk.BooleanVar(value=self.personnel.thongTinKhac.dangPhaiPhanDong)
+        dang_phai_checkbox = tk.Checkbutton(
+            dang_phai_frame,
+            text="Tham gia đảng phái phản động",
+            variable=self.dang_phai_phan_dong_var,
+            font=('Segoe UI', 10),
+            bg=self.bg_color,
+            fg=self.text_color,
+            activebackground=self.bg_color,
+            activeforeground=self.text_color,
+            selectcolor=self.bg_color
+        )
+        dang_phai_checkbox.pack(side=tk.LEFT)
         
         # Toolbar với nút thêm người thân
         nguoi_than_toolbar = tk.Frame(parent, bg=self.bg_color)
@@ -349,9 +495,9 @@ class PersonnelFormFrame(tk.Frame):
             cursor='hand2'
         ).pack(side=tk.LEFT)
         
-        # Danh sách người thân
+        # Danh sách người thân - mở rộng để hiển thị đầy đủ
         self.nguoi_than_frame = tk.Frame(parent, bg=self.bg_color)
-        self.nguoi_than_frame.pack(fill=tk.BOTH, expand=True, padx=25, pady=12)
+        self.nguoi_than_frame.pack(fill=tk.BOTH, expand=True, padx=25, pady=15)
         
         # Load danh sách người thân hiện có
         self.load_nguoi_than_list()
@@ -544,11 +690,25 @@ class PersonnelFormFrame(tk.Frame):
         self.personnel.danToc = self.dan_toc_var.get().strip()
         self.personnel.tonGiao = self.ton_giao_var.get().strip()
         self.personnel.trinhDoVanHoa = self.trinh_do_var.get().strip()
+        self.personnel.ngoaiNgu = self.ngoai_ngu_var.get().strip()
+        self.personnel.tiengDTTS = self.tieng_dtts_var.get().strip()
         # Thông tin học vấn
         self.personnel.quaTruong = self.qua_truong_var.get().strip()
         self.personnel.nganhHoc = self.nganh_hoc_var.get().strip()
         self.personnel.capHoc = self.cap_hoc_var.get().strip()
         self.personnel.thoiGianDaoTao = self.thoi_gian_dao_tao_var.get().strip()
+        self.personnel.ketQuaDaoTao = self.ket_qua_dao_tao_var.get().strip()
+        
+        # Thông tin chức vụ chiến đấu
+        self.personnel.chucVuChienDau = self.chuc_vu_chien_dau_var.get().strip()
+        self.personnel.thoiGianChucVuChienDau = self.thoi_gian_chuc_vu_chien_dau_var.get().strip()
+        self.personnel.chucVuDaQua = self.chuc_vu_da_qua_var.get().strip()
+        self.personnel.thoiGianChucVuDaQua = self.thoi_gian_chuc_vu_da_qua_var.get().strip()
+        
+        # Thông tin ngày nhận
+        self.personnel.ngayNhanCapBac = self.ngay_nhan_cap_bac_picker.get_date()
+        self.personnel.ngayNhanChucVu = self.ngay_nhan_chuc_vu_picker.get_date()
+        self.personnel.cmQuan = self.cm_quan_picker.get_date()
         
         self.personnel.thongTinKhac.dang.ngayVao = self.dang_ngay_vao_picker.get_date()
         self.personnel.thongTinKhac.dang.ngayChinhThuc = self.dang_ngay_chinh_thuc_picker.get_date()
@@ -559,22 +719,48 @@ class PersonnelFormFrame(tk.Frame):
         
         self.personnel.thongTinKhac.cdCu = self.cd_cu_var.get()
         self.personnel.thongTinKhac.yeuToNN = self.yeu_to_nn_var.get()
+        self.personnel.thongTinKhac.dangPhaiPhanDong = self.dang_phai_phan_dong_var.get()
+        
+        # Thông tin THAM GIA
+        self.personnel.thamGiaNguyQuan = 'X' if self.tham_gia_nguy_quan_var.get() else ''
+        self.personnel.thamGiaNguyQuyen = 'X' if self.tham_gia_nguy_quyen_var.get() else ''
+        self.personnel.thamGiaNoMau = self.tham_gia_no_mau_var.get().strip()
+        self.personnel.daCaiTao = self.da_cai_tao_var.get().strip()
         
         # Thông tin người thân - không cần lưu vào personnel nữa vì đã có bảng riêng
         
         # Lưu vào database
         try:
+            cd_cu_value = self.cd_cu_var.get()
+            dang_phai_phan_dong_value = self.dang_phai_phan_dong_var.get()
             if self.is_new:
                 self.db.create(self.personnel)
                 messagebox.showinfo("Thành công", f"Đã thêm quân nhân: {self.personnel.hoTen}")
+                # Lưu personnel_id để load người thân
+                self.personnel_id = self.personnel.id
             else:
                 self.personnel.id = self.personnel_id
                 if self.db.update(self.personnel):
                     messagebox.showinfo("Thành công", f"Đã cập nhật quân nhân: {self.personnel.hoTen}")
             
-            # Lưu personnel_id để load người thân
-            if self.is_new:
-                self.personnel_id = self.personnel.id
+            # Tự động thêm/xóa khỏi danh sách "Quân nhân có người thân tham gia chế độ cũ"
+            # dựa trên checkbox "Có người thân tham gia chế độ cũ"
+            if self.personnel.id:
+                if cd_cu_value:
+                    # Nếu checkbox được đánh dấu, thêm vào danh sách
+                    self.db.add_nguoi_than_che_do_cu(self.personnel.id)
+                else:
+                    # Nếu checkbox không được đánh dấu, xóa khỏi danh sách
+                    self.db.remove_nguoi_than_che_do_cu(self.personnel.id)
+                
+                # Tự động thêm/xóa khỏi danh sách "Người thân đảng phái phản động"
+                # dựa trên checkbox "Tham gia đảng phái phản động"
+                if dang_phai_phan_dong_value:
+                    # Nếu checkbox được đánh dấu, thêm vào danh sách
+                    self.db.add_nguoi_than_dang_phai_phan_dong(self.personnel.id)
+                else:
+                    # Nếu checkbox không được đánh dấu, xóa khỏi danh sách
+                    self.db.remove_nguoi_than_dang_phai_phan_dong(self.personnel.id)
 
             # Xử lý đóng form sau khi lưu
             parent = self.master
@@ -689,76 +875,111 @@ class PersonnelFormFrame(tk.Frame):
             ).pack(pady=20)
     
     def create_nguoi_than_item(self, nguoi_than: NguoiThan, stt: int):
-        """Tạo item hiển thị người thân"""
+        """Tạo item hiển thị người thân - mở rộng để hiển thị đầy đủ"""
         item_frame = tk.Frame(self.nguoi_than_frame, bg=self.section_bg, relief=tk.FLAT, bd=1)
-        item_frame.pack(fill=tk.X, pady=5, padx=5)
+        item_frame.pack(fill=tk.X, pady=8, padx=5)
         
-        # Header
-        header_frame = tk.Frame(item_frame, bg='#E8F5E9', height=40)
+        # Header - tăng chiều cao
+        header_frame = tk.Frame(item_frame, bg='#388E3C', height=50)
         header_frame.pack(fill=tk.X)
         header_frame.pack_propagate(False)
         
-        tk.Label(
+        # Title với màu trắng trên nền xanh
+        title_label = tk.Label(
             header_frame,
             text=f"{stt}. {nguoi_than.hoTen or 'Chưa có tên'} - {nguoi_than.moiQuanHe or ''}",
-            font=('Segoe UI', 11, 'bold'),
-            bg='#E8F5E9',
-            fg='#388E3C'
-        ).pack(side=tk.LEFT, padx=10, pady=8)
+            font=('Segoe UI', 12, 'bold'),
+            bg='#388E3C',
+            fg='white'
+        )
+        title_label.pack(side=tk.LEFT, padx=15, pady=12)
+        
+        # Buttons
+        btn_container = tk.Frame(header_frame, bg='#388E3C')
+        btn_container.pack(side=tk.RIGHT, padx=10)
         
         tk.Button(
-            header_frame,
+            btn_container,
             text="✏️ Sửa",
             command=lambda: self.edit_nguoi_than(nguoi_than),
             font=('Segoe UI', 9),
             bg='#FF9800',
             fg='white',
             relief=tk.FLAT,
-            padx=10,
-            pady=3,
+            padx=12,
+            pady=5,
             cursor='hand2'
-        ).pack(side=tk.RIGHT, padx=5)
+        ).pack(side=tk.LEFT, padx=3)
         
         tk.Button(
-            header_frame,
+            btn_container,
             text="🗑️ Xóa",
             command=lambda: self.delete_nguoi_than(nguoi_than.id),
             font=('Segoe UI', 9),
             bg='#F44336',
             fg='white',
             relief=tk.FLAT,
-            padx=10,
-            pady=3,
+            padx=12,
+            pady=5,
             cursor='hand2'
-        ).pack(side=tk.RIGHT, padx=5)
+        ).pack(side=tk.LEFT, padx=3)
         
-        # Content
-        content_frame = tk.Frame(item_frame, bg=self.section_bg)
-        content_frame.pack(fill=tk.X, padx=10, pady=10)
+        # Content - hiển thị từng dòng riêng biệt
+        content_frame = tk.Frame(item_frame, bg='#C8E6C9')
+        content_frame.pack(fill=tk.X, padx=0, pady=0)
         
-        info_text = f"Ngày sinh: {nguoi_than.ngaySinh or 'Chưa có'} | "
-        info_text += f"Địa chỉ: {nguoi_than.diaChi or 'Chưa có'} | "
-        info_text += f"SĐT: {nguoi_than.soDienThoai or 'Chưa có'}"
+        # Tạo từng dòng thông tin riêng biệt
+        info_items = []
         
-        tk.Label(
-            content_frame,
-            text=info_text,
-            font=('Segoe UI', 9),
-            bg=self.section_bg,
-            fg=self.text_color,
-            anchor=tk.W
-        ).pack(fill=tk.X, pady=2)
-        
+        if nguoi_than.ngaySinh:
+            info_items.append(("Ngày sinh:", nguoi_than.ngaySinh))
+        if nguoi_than.diaChi:
+            info_items.append(("Địa chỉ:", nguoi_than.diaChi))
+        if nguoi_than.soDienThoai:
+            info_items.append(("Số điện thoại:", nguoi_than.soDienThoai))
         if nguoi_than.noiDung:
+            info_items.append(("Nội dung:", nguoi_than.noiDung))
+        if nguoi_than.ghiChu:
+            info_items.append(("Ghi chú:", nguoi_than.ghiChu))
+        
+        # Hiển thị từng dòng
+        for idx, (label, value) in enumerate(info_items):
+            row_frame = tk.Frame(content_frame, bg='#C8E6C9')
+            row_frame.pack(fill=tk.X, padx=15, pady=6)
+            
+            # Label
+            tk.Label(
+                row_frame,
+                text=label,
+                font=('Segoe UI', 10, 'bold'),
+                bg='#C8E6C9',
+                fg='#2E7D32',
+                width=15,
+                anchor=tk.W
+            ).pack(side=tk.LEFT, padx=(0, 10))
+            
+            # Value - cho phép wrap text
+            value_label = tk.Label(
+                row_frame,
+                text=value,
+                font=('Segoe UI', 10),
+                bg='#C8E6C9',
+                fg='#424242',
+                anchor=tk.W,
+                justify=tk.LEFT,
+                wraplength=800  # Tăng wraplength để hiển thị nhiều hơn
+            )
+            value_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Nếu không có thông tin nào
+        if not info_items:
             tk.Label(
                 content_frame,
-                text=f"Nội dung: {nguoi_than.noiDung}",
-                font=('Segoe UI', 9),
-                bg=self.section_bg,
-                fg=self.text_color,
-                anchor=tk.W,
-                wraplength=600
-            ).pack(fill=tk.X, pady=2)
+                text="Chưa có thông tin chi tiết",
+                font=('Segoe UI', 9, 'italic'),
+                bg='#C8E6C9',
+                fg='#666666'
+            ).pack(padx=15, pady=10)
     
     def on_yeu_to_nn_changed(self):
         """Xử lý khi checkbox yếu tố nước ngoài thay đổi"""
