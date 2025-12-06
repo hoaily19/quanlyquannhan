@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from services.database import DatabaseService
 from services.export import ExportService
+from services.discord_bot import get_discord_bot
 from gui.personnel_list_frame import PersonnelListFrame
 from gui.personnel_form_frame import PersonnelFormFrame
 from gui.report_frame import ReportFrame
@@ -45,8 +46,71 @@ class MainWindow:
         self.root = root
         self.db = DatabaseService()
         self.edit_personnel_id = None  # Lưu ID khi edit
+        self.current_username = ""  # Username từ đăng nhập
         self.setup_menu()
         self.current_frame = None
+        
+        # Khởi động Discord bot
+        try:
+            self.discord_bot = get_discord_bot()
+            
+            # Thiết lập callbacks để điều khiển ứng dụng từ Discord
+            self.discord_bot.set_shutdown_callback(self._shutdown_app)
+            self.discord_bot.set_restart_callback(self._restart_app)
+            
+            self.discord_bot.start()
+            logger.info("Đã khởi động Discord bot")
+            
+            # Gửi thông báo khi ứng dụng khởi động (sau một chút để bot kết nối)
+            self.root.after(3000, lambda: self._notify_app_started())
+        except Exception as e:
+            logger.error(f"Lỗi khi khởi động Discord bot: {str(e)}")
+            self.discord_bot = None
+    
+    def _shutdown_app(self):
+        """Tắt ứng dụng (được gọi từ Discord bot)"""
+        logger.warning("⚠️ Nhận lệnh tắt ứng dụng từ Discord")
+        try:
+            if self.discord_bot:
+                self.discord_bot.send_notification(
+                    "🛑 Ứng Dụng Đã Tắt",
+                    "Ứng dụng đã được tắt từ xa qua Discord",
+                    color=0xF44336
+                )
+            # Đợi một chút để gửi thông báo
+            self.root.after(1000, self.root.quit)
+        except Exception as e:
+            logger.error(f"Lỗi khi tắt ứng dụng: {str(e)}")
+            self.root.quit()
+    
+    def _restart_app(self):
+        """Khởi động lại ứng dụng (được gọi từ Discord bot)"""
+        logger.warning("⚠️ Nhận lệnh khởi động lại ứng dụng từ Discord")
+        try:
+            if self.discord_bot:
+                self.discord_bot.send_notification(
+                    "🔄 Đang Khởi Động Lại",
+                    "Ứng dụng đang được khởi động lại...",
+                    color=0xFF9800
+                )
+            # Đợi một chút để gửi thông báo, sau đó restart
+            self.root.after(2000, lambda: self.root.quit())
+            # Note: Để restart thực sự, cần có script wrapper hoặc system call
+        except Exception as e:
+            logger.error(f"Lỗi khi khởi động lại ứng dụng: {str(e)}")
+    
+    def _notify_app_started(self):
+        """Gửi thông báo khi ứng dụng khởi động"""
+        try:
+            if self.discord_bot:
+                # Sử dụng username từ đăng nhập hoặc lấy từ hệ thống
+                username = self.current_username
+                if not username:
+                    import os
+                    username = os.getenv('USERNAME') or os.getenv('USER') or ''
+                self.discord_bot.notify_app_started(username)
+        except Exception as e:
+            logger.error(f"Lỗi khi gửi thông báo khởi động: {str(e)}")
         
     def setup_menu(self):
         """Thiết lập menu bar"""
@@ -77,6 +141,8 @@ class MainWindow:
         # Menu Hệ Thống
         system_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Hệ Thống", menu=system_menu)
+        system_menu.add_command(label="Test Discord Bot", command=self.test_discord_bot)
+        system_menu.add_separator()
         system_menu.add_command(label="Đăng Xuất", command=self.logout)
         system_menu.add_command(label="Thoát", command=self.root.quit)
     
@@ -397,6 +463,31 @@ class MainWindow:
                 messagebox.showinfo("Thành công", f"Đã xuất file: {file_path}")
             except Exception as e:
                 messagebox.showerror("Lỗi", f"Không thể xuất file: {str(e)}")
+    
+    def test_discord_bot(self):
+        """Test kết nối Discord bot"""
+        try:
+            if not self.discord_bot:
+                messagebox.showwarning("Cảnh báo", "Discord bot chưa được khởi động")
+                return
+            
+            result = self.discord_bot.test_connection()
+            if result:
+                messagebox.showinfo("Thành công", 
+                    "✅ Bot đã kết nối thành công!\n"
+                    "Đã gửi thông báo test lên Discord.\n"
+                    "Vui lòng kiểm tra channel trên Discord.")
+            else:
+                messagebox.showwarning("Cảnh báo", 
+                    "❌ Bot chưa kết nối hoặc chưa có channel.\n"
+                    "Vui lòng kiểm tra:\n"
+                    "1. Bot đã được mời vào server chưa?\n"
+                    "2. Channel ID có đúng không?\n"
+                    "3. Bot có quyền gửi tin nhắn không?\n"
+                    "4. Xem log để biết chi tiết lỗi.")
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể test bot: {str(e)}")
+            logger.error(f"Lỗi khi test Discord bot: {str(e)}", exc_info=True)
     
     def logout(self):
         """Đăng xuất"""

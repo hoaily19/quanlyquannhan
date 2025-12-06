@@ -785,8 +785,36 @@ class PersonnelListFrame(tk.Frame):
         header_content = tk.Frame(header_frame, bg=MILITARY_COLORS['primary'])
         header_content.pack(expand=True, fill=tk.BOTH, padx=30, pady=15)
         
-        tk.Label(
+        # Nút fullscreen
+        is_fullscreen = [False]  # Dùng list để có thể thay đổi trong closure
+        
+        def toggle_fullscreen():
+            is_fullscreen[0] = not is_fullscreen[0]
+            detail_window.attributes('-fullscreen', is_fullscreen[0])
+            if is_fullscreen[0]:
+                fullscreen_btn.config(text="⛶ Thoát Toàn Màn Hình")
+            else:
+                fullscreen_btn.config(text="⛶ Toàn Màn Hình")
+        
+        fullscreen_btn = tk.Button(
             header_content,
+            text="⛶ Toàn Màn Hình",
+            command=toggle_fullscreen,
+            font=('Segoe UI', 10, 'bold'),
+            bg='#FF9800',
+            fg='white',
+            relief=tk.FLAT,
+            padx=15,
+            pady=5,
+            cursor='hand2'
+        )
+        fullscreen_btn.pack(side=tk.RIGHT, padx=10)
+        
+        title_frame = tk.Frame(header_content, bg=MILITARY_COLORS['primary'])
+        title_frame.pack(expand=True)
+        
+        tk.Label(
+            title_frame,
             text=" SƠ YẾU LÍ LỊCH",
             font=('Arial', 18, 'bold'),
             bg=MILITARY_COLORS['primary'],
@@ -794,7 +822,7 @@ class PersonnelListFrame(tk.Frame):
         ).pack()
         
         tk.Label(
-            header_content,
+            title_frame,
             text=person.hoTen or 'Chưa có tên',
             font=('Arial', 14),
             bg=MILITARY_COLORS['primary'],
@@ -1023,13 +1051,79 @@ class PersonnelListFrame(tk.Frame):
                     row_counter += 1
         
         # Section 9: Thông tin khác
-        if person.thongTinKhac.cdCu or person.thongTinKhac.yeuToNN or person.ghiChu:
-            section9 = create_section(scrollable_frame, "9. THÔNG TIN KHÁC")
-            row = 0
-            create_info_row(section9, "Chế độ cũ", 'Có' if person.thongTinKhac.cdCu else 'Không', row); row += 1
-            create_info_row(section9, "Yếu tố nước ngoài", 'Có' if person.thongTinKhac.yeuToNN else 'Không', row); row += 1
-            if person.ghiChu:
-                create_info_row(section9, "Ghi chú", person.ghiChu, row); row += 1
+        section9 = create_section(scrollable_frame, "9. THÔNG TIN KHÁC")
+        row = 0
+        create_info_row(section9, "Chế độ cũ", 'Có' if person.thongTinKhac.cdCu else 'Không', row); row += 1
+        create_info_row(section9, "Yếu tố nước ngoài", 'Có' if person.thongTinKhac.yeuToNN else 'Không', row); row += 1
+        if person.ngoaiNgu:
+            create_info_row(section9, "Ngoại ngữ", person.ngoaiNgu, row); row += 1
+        if person.tiengDTTS:
+            create_info_row(section9, "Tiếng dân tộc thiểu số", person.tiengDTTS, row); row += 1
+        if person.ghiChu:
+            create_info_row(section9, "Ghi chú", person.ghiChu, row); row += 1
+        
+        # Section 10: Thông tin từ các danh sách
+        section10 = create_section(scrollable_frame, "10. THÔNG TIN TỪ CÁC DANH SÁCH")
+        row = 0
+        
+        # Kiểm tra đảng viên diễn tập
+        dang_vien_dien_tap_ids = set(self.db.get_dang_vien_dien_tap())
+        if person.id in dang_vien_dien_tap_ids:
+            ghi_chu_dvd = self.db.get_dang_vien_dien_tap_ghi_chu(person.id)
+            info_text = "Có tham gia"
+            if ghi_chu_dvd:
+                info_text += f" - Ghi chú: {ghi_chu_dvd}"
+            create_info_row(section10, "Đảng viên diễn tập", info_text, row); row += 1
+        
+        # Kiểm tra tổ công tác dân vận
+        to_dan_van_ids = set(self.db.get_to_dan_van())
+        if person.id in to_dan_van_ids:
+            ghi_chu_tdv = self.db.get_to_dan_van_ghi_chu(person.id)
+            info_text = "Có tham gia"
+            if ghi_chu_tdv:
+                info_text += f" - Ghi chú: {ghi_chu_tdv}"
+            create_info_row(section10, "Tổ công tác dân vận", info_text, row); row += 1
+        
+        # Kiểm tra quân nhân có người thân tham gia chế độ cũ
+        nguoi_than_che_do_cu_ids = set(self.db.get_nguoi_than_che_do_cu())
+        if person.id in nguoi_than_che_do_cu_ids:
+            ghi_chu_ntcdc = self.db.get_nguoi_than_che_do_cu_ghi_chu(person.id)
+            info_text = "Có người thân tham gia chế độ cũ"
+            if ghi_chu_ntcdc:
+                info_text += f" - Ghi chú: {ghi_chu_ntcdc}"
+            create_info_row(section10, "Người thân chế độ cũ", info_text, row); row += 1
+        
+        # Kiểm tra người thân đảng phái phản động
+        nguoi_than_dang_phai_phan_dong_ids = set(self.db.get_nguoi_than_dang_phai_phan_dong())
+        if person.id in nguoi_than_dang_phai_phan_dong_ids:
+            create_info_row(section10, "Người thân đảng phái phản động", "Có người thân tham gia đảng phái phản động", row); row += 1
+        
+        # Kiểm tra ban chấp hành chi đoàn
+        ban_chap_hanh_ids = set(self.db.get_ban_chap_hanh_chi_doan())
+        if person.id in ban_chap_hanh_ids:
+            chuc_vu_doan = person.thongTinKhac.doan.chucVuDoan or ''
+            info_text = "Có tham gia"
+            if chuc_vu_doan:
+                info_text += f" - Chức vụ: {chuc_vu_doan}"
+            create_info_row(section10, "Ban chấp hành chi đoàn", info_text, row); row += 1
+        
+        # Kiểm tra bảo vệ an ninh
+        try:
+            bao_ve_an_ninh_ids = set(self.db.get_bao_ve_an_ninh())
+            if person.id in bao_ve_an_ninh_ids:
+                bao_ve_info = self.db.get_bao_ve_an_ninh_info(person.id)
+                info_text = "Có tham gia"
+                if bao_ve_info.get('thoiGianVao'):
+                    info_text += f" - Thời gian vào: {bao_ve_info['thoiGianVao']}"
+                if bao_ve_info.get('thoiGianRa'):
+                    info_text += f" - Thời gian ra: {bao_ve_info['thoiGianRa']}"
+                create_info_row(section10, "Bảo vệ an ninh", info_text, row); row += 1
+        except:
+            pass
+        
+        # Nếu không có thông tin nào, hiển thị "Không có"
+        if row == 0:
+            create_info_row(section10, "Thông tin danh sách", "Không có thông tin trong các danh sách", row); row += 1
         
         # Pack canvas và scrollbar trực tiếp vào detail_window - Đảm bảo nội dung hiển thị
         # Phải pack canvas TRƯỚC footer để nội dung hiển thị đúng
@@ -1087,7 +1181,17 @@ class PersonnelListFrame(tk.Frame):
             return
         
         if messagebox.askyesno("Xác nhận", f"Bạn có chắc muốn xóa {person.hoTen}?"):
+            personnel_name = person.hoTen
             if self.db.delete(personnel_id):
+                # Gửi thông báo Discord
+                try:
+                    from services.discord_bot import get_discord_bot
+                    discord_bot = get_discord_bot()
+                    discord_bot.notify_personnel_deleted(personnel_name)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Lỗi khi gửi thông báo Discord: {str(e)}")
+                
                 messagebox.showinfo("Thành công", "Đã xóa quân nhân")
                 self.load_data()
                 self.selected_id = None
@@ -1127,71 +1231,17 @@ class PersonnelListFrame(tk.Frame):
         # Dialog nhập thông tin
         dialog = tk.Toplevel(self)
         dialog.title("Xuất file Word - Danh sách dân tộc thiểu số")
-        dialog.geometry("500x400")
+        dialog.geometry("550x600")
         dialog.configure(bg='#FAFAFA')
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
         
-        tk.Label(
-            dialog,
-            text="📄 XUẤT FILE WORD",
-            font=('Arial', 14, 'bold'),
-            bg='#FAFAFA',
-            fg='#388E3C'
-        ).pack(pady=10)
+        # Main container
+        main_frame = tk.Frame(dialog, bg='#FAFAFA')
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
-        # Form nhập thông tin
-        form_frame = tk.Frame(dialog, bg='#FAFAFA')
-        form_frame.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
-        
-        tk.Label(form_frame, text="Tiểu đoàn:", bg='#FAFAFA', font=('Arial', 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
-        tieu_doan_var = tk.StringVar(value="TIỂU ĐOÀN 38")
-        tk.Entry(form_frame, textvariable=tieu_doan_var, width=30, font=('Arial', 10)).grid(row=0, column=1, pady=5, padx=10)
-        
-        tk.Label(form_frame, text="Đại đội:", bg='#FAFAFA', font=('Arial', 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
-        dai_doi_var = tk.StringVar(value="ĐẠI ĐỘI 3")
-        tk.Entry(form_frame, textvariable=dai_doi_var, width=30, font=('Arial', 10)).grid(row=1, column=1, pady=5, padx=10)
-        
-        tk.Label(form_frame, text="Địa điểm:", bg='#FAFAFA', font=('Arial', 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
-        dia_diem_var = tk.StringVar(value="Đắk Lắk")
-        tk.Entry(form_frame, textvariable=dia_diem_var, width=30, font=('Arial', 10)).grid(row=2, column=1, pady=5, padx=10)
-        
-        tk.Label(form_frame, text="Chính trị viên:", bg='#FAFAFA', font=('Arial', 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
-        chinh_tri_vien_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=chinh_tri_vien_var, width=30, font=('Arial', 10)).grid(row=3, column=1, pady=5, padx=10)
-        
-        # Thông tin xem trước
-        preview_frame = tk.Frame(dialog, bg='#FFFFFF', relief=tk.SOLID, bd=1)
-        preview_frame.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
-        
-        tk.Label(
-            preview_frame,
-            text=f"📊 Xem trước:\nSố lượng quân nhân: {len(filtered_list)}",
-            bg='#FFFFFF',
-            font=('Arial', 10),
-            justify=tk.LEFT
-        ).pack(padx=10, pady=10, anchor=tk.W)
-        
-        # Danh sách dân tộc (lấy từ database, loại trừ Kinh)
-        ethnic_list = {}
-        for person in filtered_list:
-            dan_toc = (person.danToc or '').strip()
-            if dan_toc and dan_toc.lower() not in ['kinh', 'việt', 'việt nam']:
-                ethnic_list[dan_toc] = ethnic_list.get(dan_toc, 0) + 1
-        
-        ethnic_text = "Dân tộc trong danh sách:\n"
-        if ethnic_list:
-            for ethnic, count in sorted(ethnic_list.items()):
-                ethnic_text += f"  • {ethnic}: {count}\n"
-        else:
-            ethnic_text += "  (Chưa có dữ liệu)"
-        
-        tk.Label(
-            preview_frame,
-            text=ethnic_text,
-            bg='#FFFFFF',
-            font=('Arial', 9),
-            justify=tk.LEFT
-        ).pack(padx=10, pady=5, anchor=tk.W)
-        
+        # Định nghĩa hàm do_export trước để có thể dùng ngay
         def do_export():
             try:
                 file_path = filedialog.asksaveasfilename(
@@ -1213,35 +1263,203 @@ class PersonnelListFrame(tk.Frame):
                     with open(file_path, 'wb') as f:
                         f.write(word_data)
                     
+                    # Gửi thông báo Discord
+                    try:
+                        from services.discord_bot import get_discord_bot
+                        discord_bot = get_discord_bot()
+                        import os
+                        file_name = os.path.basename(file_path)
+                        discord_bot.notify_export("Word", file_name, len(filtered_list))
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).error(f"Lỗi khi gửi thông báo Discord: {str(e)}")
+                    
                     messagebox.showinfo("Thành công", f"Đã xuất file:\n{file_path}\n\nSố lượng: {len(filtered_list)} quân nhân")
                     dialog.destroy()
             except Exception as e:
                 messagebox.showerror("Lỗi", f"Không thể xuất file:\n{str(e)}")
         
-        # Nút xuất
-        btn_frame = tk.Frame(dialog, bg='#FAFAFA')
-        btn_frame.pack(pady=10)
+        # Form nhập thông tin
+        form_frame = tk.Frame(main_frame, bg='#FAFAFA')
+        form_frame.pack(fill=tk.X, pady=(0, 20))
         
+        # Tiểu đoàn
+        tk.Label(
+            form_frame, 
+            text="Tiểu đoàn:", 
+            bg='#FAFAFA', 
+            font=('Arial', 10),
+            width=15,
+            anchor=tk.W
+        ).grid(row=0, column=0, sticky=tk.W, pady=8)
+        tieu_doan_var = tk.StringVar(value="TIỂU ĐOÀN 38")
+        tieu_doan_entry = tk.Entry(
+            form_frame, 
+            textvariable=tieu_doan_var, 
+            width=35, 
+            font=('Arial', 10)
+        )
+        tieu_doan_entry.grid(row=0, column=1, pady=8, padx=(10, 0), sticky=tk.EW)
+        
+        # Đại đội
+        tk.Label(
+            form_frame, 
+            text="Đại đội:", 
+            bg='#FAFAFA', 
+            font=('Arial', 10),
+            width=15,
+            anchor=tk.W
+        ).grid(row=1, column=0, sticky=tk.W, pady=8)
+        dai_doi_var = tk.StringVar(value="ĐẠI ĐỘI 3")
+        dai_doi_entry = tk.Entry(
+            form_frame, 
+            textvariable=dai_doi_var, 
+            width=35, 
+            font=('Arial', 10)
+        )
+        dai_doi_entry.grid(row=1, column=1, pady=8, padx=(10, 0), sticky=tk.EW)
+        
+        # Địa điểm
+        tk.Label(
+            form_frame, 
+            text="Địa điểm:", 
+            bg='#FAFAFA', 
+            font=('Arial', 10),
+            width=15,
+            anchor=tk.W
+        ).grid(row=2, column=0, sticky=tk.W, pady=8)
+        dia_diem_var = tk.StringVar(value="Đắk Lắk")
+        dia_diem_entry = tk.Entry(
+            form_frame, 
+            textvariable=dia_diem_var, 
+            width=35, 
+            font=('Arial', 10)
+        )
+        dia_diem_entry.grid(row=2, column=1, pady=8, padx=(10, 0), sticky=tk.EW)
+        
+        # Chính trị viên
+        tk.Label(
+            form_frame, 
+            text="Chính trị viên:", 
+            bg='#FAFAFA', 
+            font=('Arial', 10),
+            width=15,
+            anchor=tk.W
+        ).grid(row=3, column=0, sticky=tk.W, pady=8)
+        chinh_tri_vien_var = tk.StringVar()
+        chinh_tri_vien_entry = tk.Entry(
+            form_frame, 
+            textvariable=chinh_tri_vien_var, 
+            width=35, 
+            font=('Arial', 10)
+        )
+        chinh_tri_vien_entry.grid(row=3, column=1, pady=8, padx=(10, 0), sticky=tk.EW)
+        
+        form_frame.grid_columnconfigure(1, weight=1)
+        
+        # Thông tin xem trước
+        preview_frame = tk.Frame(main_frame, bg='#FFFFFF', relief=tk.SOLID, bd=1)
+        preview_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
+        
+        preview_label = tk.Label(
+            preview_frame,
+            text="Xem trước:",
+            bg='#FFFFFF',
+            font=('Arial', 11, 'bold'),
+            anchor=tk.W
+        )
+        preview_label.pack(padx=15, pady=(15, 10), anchor=tk.W)
+        
+        # Số lượng quân nhân
+        count_label = tk.Label(
+            preview_frame,
+            text=f"Số lượng quân nhân: {len(filtered_list)}",
+            bg='#FFFFFF',
+            font=('Arial', 10),
+            anchor=tk.W
+        )
+        count_label.pack(padx=15, pady=(0, 10), anchor=tk.W)
+        
+        # Danh sách dân tộc (lấy từ database, loại trừ Kinh)
+        ethnic_list = {}
+        for person in filtered_list:
+            dan_toc = (person.danToc or '').strip()
+            if dan_toc and dan_toc.lower() not in ['kinh', 'việt', 'việt nam']:
+                ethnic_list[dan_toc] = ethnic_list.get(dan_toc, 0) + 1
+        
+        # Tạo frame scrollable cho danh sách dân tộc
+        ethnic_canvas = tk.Canvas(preview_frame, bg='#FFFFFF', highlightthickness=0, height=150)
+        ethnic_scrollbar = ttk.Scrollbar(preview_frame, orient=tk.VERTICAL, command=ethnic_canvas.yview)
+        ethnic_scrollable_frame = tk.Frame(ethnic_canvas, bg='#FFFFFF')
+        
+        ethnic_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: ethnic_canvas.configure(scrollregion=ethnic_canvas.bbox("all"))
+        )
+        
+        ethnic_canvas.create_window((0, 0), window=ethnic_scrollable_frame, anchor="nw")
+        ethnic_canvas.configure(yscrollcommand=ethnic_scrollbar.set)
+        
+        if ethnic_list:
+            for idx, (ethnic, count) in enumerate(sorted(ethnic_list.items())):
+                tk.Label(
+                    ethnic_scrollable_frame,
+                    text=f"  • {ethnic}: {count}",
+                    bg='#FFFFFF',
+                    font=('Arial', 10),
+                    anchor=tk.W
+                ).pack(padx=15, pady=2, anchor=tk.W)
+        else:
+            tk.Label(
+                ethnic_scrollable_frame,
+                text="  (Chưa có dữ liệu)",
+                bg='#FFFFFF',
+                font=('Arial', 10),
+                anchor=tk.W,
+                fg='#757575'
+            ).pack(padx=15, pady=2, anchor=tk.W)
+        
+        ethnic_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 0))
+        ethnic_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        def update_canvas_width(event):
+            canvas_width = event.width
+            if canvas_width > 1:
+                ethnic_canvas.itemconfig(ethnic_canvas.find_all()[0], width=canvas_width)
+        
+        ethnic_canvas.bind('<Configure>', update_canvas_width)
+        
+        # Nút xuất file và hủy ở dưới cùng - cùng hàng
+        btn_frame = tk.Frame(main_frame, bg='#FAFAFA')
+        btn_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        # Nút XUẤT FILE WORD bên trái
         tk.Button(
             btn_frame,
-            text="📄 Xuất File",
+            text="📄 XUẤT FILE WORD",
             command=do_export,
             bg='#4CAF50',
             fg='white',
-            font=('Arial', 11, 'bold'),
-            padx=20,
-            pady=5,
-            cursor='hand2'
+            font=('Arial', 12, 'bold'),
+            padx=25,
+            pady=10,
+            cursor='hand2',
+            relief=tk.FLAT
         ).pack(side=tk.LEFT, padx=5)
         
+        # Spacer để đẩy nút hủy sang bên phải
+        tk.Frame(btn_frame, bg='#FAFAFA').pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Nút Hủy bên phải
         tk.Button(
             btn_frame,
-            text="Hủy",
+            text="❌ Hủy",
             command=dialog.destroy,
-            bg='#CCCCCC',
-            fg='black',
+            bg='#757575',
+            fg='white',
             font=('Arial', 11),
             padx=20,
-            pady=5,
-            cursor='hand2'
-        ).pack(side=tk.LEFT, padx=5)
+            pady=8,
+            cursor='hand2',
+            relief=tk.FLAT
+        ).pack(side=tk.RIGHT, padx=5)

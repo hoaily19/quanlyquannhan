@@ -1409,77 +1409,187 @@ class UnitManagementFrame(tk.Frame):
         # Mở dialog chọn quân nhân
         dialog = tk.Toplevel(self)
         dialog.title(f"Quản Lý Quân Nhân - {unit.ten}")
-        dialog.geometry("750x600")
-        dialog.configure(bg=self.bg_color)
+        dialog.geometry("1100x700")
+        dialog.configure(bg='#FAFAFA')
         dialog.resizable(True, True)
+        dialog.transient(self)
+        dialog.grab_set()
         
         # Dùng grid để control layout tốt hơn
-        dialog.grid_rowconfigure(1, weight=1)  # Row 1 (tree) có thể expand
-        dialog.grid_rowconfigure(2, weight=0)  # Row 2 (buttons) không expand
+        dialog.grid_rowconfigure(0, weight=1)  # Row 0 (list_frame) có thể expand
+        dialog.grid_rowconfigure(1, weight=0)  # Row 1 (btn_frame) không expand
         dialog.grid_columnconfigure(0, weight=1)
         
-        # Title - Row 0
-        title_label = tk.Label(
-            dialog,
+        # Frame chứa danh sách
+        list_frame = tk.Frame(dialog, bg='#FAFAFA')
+        list_frame.grid(row=0, column=0, padx=10, pady=10, sticky=tk.NSEW)
+        
+        # Label
+        label = tk.Label(
+            list_frame,
             text=f"Chọn quân nhân cho: {unit.ten}",
-            font=('Segoe UI', 14, 'bold'),
-            bg=self.bg_color,
-            fg='#388E3C'
+            font=('Segoe UI', 10),
+            bg='#FAFAFA'
         )
-        title_label.grid(row=0, column=0, pady=10, sticky=tk.N)
+        label.pack(anchor=tk.W, pady=5)
         
-        # Treeview với checkbox - Row 1, CÓ GIỚI HẠN chiều cao
-        tree_frame = tk.Frame(dialog, bg=self.bg_color)
-        tree_frame.grid(row=1, column=0, padx=10, pady=5, sticky=tk.NSEW)
-        tree_frame.grid_rowconfigure(0, weight=1)
-        tree_frame.grid_columnconfigure(0, weight=1)
+        # Toolbar với tìm kiếm và chọn tất cả
+        toolbar_frame = tk.Frame(list_frame, bg='#FAFAFA')
+        toolbar_frame.pack(fill=tk.X, pady=5)
         
-        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
-        tree = ttk.Treeview(
-            tree_frame,
-            columns=('hoTen', 'capBac', 'chucVu'),
-            show='tree headings',
-            yscrollcommand=scrollbar.set,
-            height=12  # Giảm height để để chỗ cho nút
-        )
+        # Tìm kiếm
+        tk.Label(toolbar_frame, text="Tìm kiếm:", font=('Segoe UI', 9), bg='#FAFAFA').pack(side=tk.LEFT, padx=5)
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(toolbar_frame, textvariable=search_var, width=30, font=('Segoe UI', 9))
+        search_entry.pack(side=tk.LEFT, padx=5)
         
+        # Treeview với checkbox
+        tree_frame = tk.Frame(list_frame, bg='#FAFAFA')
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Treeview với checkbox
+        columns = ('Họ và Tên', 'Ngày Sinh', 'Cấp Bậc', 'Chức Vụ', 'Đơn Vị', 'Dân Tộc')
+        tree = ttk.Treeview(list_frame, columns=columns, show='tree headings', height=20)
+        
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        
+        # Configure columns
         tree.heading('#0', text='Chọn')
-        tree.heading('hoTen', text='Họ và Tên')
-        tree.heading('capBac', text='Cấp Bậc')
-        tree.heading('chucVu', text='Chức Vụ')
-        
-        tree.column('#0', width=50)
-        tree.column('hoTen', width=250)
-        tree.column('capBac', width=120)
-        tree.column('chucVu', width=150)
-        
-        scrollbar.config(command=tree.yview)
+        tree.column('#0', width=50, anchor=tk.CENTER)
+        for col in columns:
+            tree.heading(col, text=col)
+            if col == 'Họ và Tên':
+                tree.column(col, width=200)
+            else:
+                tree.column(col, width=120)
         
         # Load tất cả quân nhân
         all_personnel = self.db.get_all()
         selected_ids = set(unit.personnelIds)
         
-        for person in all_personnel:
-            is_selected = person.id in selected_ids
-            tree.insert('', tk.END, iid=person.id, 
-                       text='✓' if is_selected else '',
-                       values=(person.hoTen or '', person.capBac or '', person.chucVu or ''))
+        # Nút chọn tất cả / Bỏ chọn tất cả
+        select_all_var = tk.BooleanVar(value=False)
         
+        def toggle_select_all():
+            select_all_var.set(not select_all_var.get())
+            for item in tree.get_children():
+                item_id = tree.item(item, 'tags')[0] if tree.item(item, 'tags') else None
+                if item_id:
+                    if select_all_var.get():
+                        tree.item(item, text='✓')
+                        selected_ids.add(item_id)
+                    else:
+                        tree.item(item, text='')
+                        selected_ids.discard(item_id)
+        
+        select_all_btn = tk.Button(
+            toolbar_frame,
+            text="✔ Chọn Tất Cả",
+            command=toggle_select_all,
+            font=('Segoe UI', 9),
+            bg='#2196F3',
+            fg='white',
+            relief=tk.FLAT,
+            padx=10,
+            pady=3,
+            cursor='hand2'
+        )
+        select_all_btn.pack(side=tk.LEFT, padx=5)
+        
+        def load_tree_data():
+            """Load dữ liệu vào tree với filter và sắp xếp theo cấp bậc"""
+            # Xóa dữ liệu cũ
+            for item in tree.get_children():
+                tree.delete(item)
+            
+            # Lọc theo tìm kiếm
+            search_text = search_var.get().lower()
+            display_personnel = all_personnel
+            if search_text:
+                display_personnel = [p for p in all_personnel 
+                                  if search_text in (p.hoTen or '').lower() or
+                                     search_text in (p.capBac or '').lower() or
+                                     search_text in (p.chucVu or '').lower()]
+            
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            def _parse_cap_bac_rank(cap_bac: str) -> int:
+                """Parse cấp bậc thành số để so sánh"""
+                if not cap_bac:
+                    return 0
+                cap_bac = cap_bac.strip().upper()
+                if 'ĐẠI TÁ' in cap_bac: return 100
+                elif 'TRUNG TÁ' in cap_bac: return 90
+                elif 'THIẾU TÁ' in cap_bac: return 80
+                elif 'ĐẠI ÚY' in cap_bac: return 70
+                elif 'THƯỢNG ÚY' in cap_bac: return 60
+                elif 'TRUNG ÚY' in cap_bac: return 50
+                elif 'THIẾU ÚY' in cap_bac: return 40
+                elif 'THƯỢNG SĨ' in cap_bac: return 30
+                elif 'TRUNG SĨ' in cap_bac: return 20
+                elif 'HẠ SĨ' in cap_bac: return 10
+                elif cap_bac.startswith('H'):
+                    try:
+                        return int(cap_bac[1:])
+                    except:
+                        return 0
+                else:
+                    try:
+                        return int(cap_bac) + 10
+                    except:
+                        return 0
+            
+            def sort_key(person):
+                cap_bac_rank = _parse_cap_bac_rank(person.capBac or '')
+                ho_ten = (person.hoTen or '').lower()
+                return (-cap_bac_rank, ho_ten)
+            
+            display_personnel = sorted(display_personnel, key=sort_key)
+            
+            # Load vào tree
+            for person in display_personnel:
+                is_selected = person.id in selected_ids
+                item_text = '✓' if is_selected else ''
+                
+                item = tree.insert('', 'end', 
+                                  text=item_text,
+                                  tags=(person.id,),
+                                  values=(
+                                      person.hoTen or '',
+                                      person.ngaySinh or '',
+                                      person.capBac or '',
+                                      person.chucVu or '',
+                                      person.donVi or '',
+                                      person.danToc or ''
+                                  ))
+        
+        def on_item_click(event):
+            """Xử lý click vào item"""
+            item = tree.identify_row(event.y)
+            if item:
+                # Set selection để highlight row
+                tree.selection_set(item)
+                item_id = tree.item(item, 'tags')[0] if tree.item(item, 'tags') else None
+                if item_id:
+                    current_text = tree.item(item, 'text')
+                    if current_text == '✓':
+                        tree.item(item, text='')
+                        selected_ids.discard(item_id)
+                    else:
+                        tree.item(item, text='✓')
+                        selected_ids.add(item_id)
+        
+        tree.bind('<Button-1>', on_item_click)
+        tree.bind('<Double-1>', lambda e: edit_selected_personnel())  # Double click để sửa
+        search_var.trace('w', lambda *args: load_tree_data())
+        
+        # Pack tree và scrollbar
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Bind click để toggle
-        def toggle_selection(event):
-            item = tree.identify_row(event.y)
-            if item:
-                current_text = tree.item(item, 'text')
-                if current_text == '✓':
-                    tree.item(item, text='')
-                else:
-                    tree.item(item, text='✓')
-        
-        tree.bind('<Button-1>', toggle_selection)
-        tree.bind('<Double-1>', lambda e: edit_selected_personnel())  # Double click để sửa
+        # Load dữ liệu ban đầu
+        load_tree_data()
         
         # Hàm sửa quân nhân
         def edit_selected_personnel():
@@ -1502,41 +1612,43 @@ class UnitManagementFrame(tk.Frame):
             
             def on_edit_close():
                 # Reload danh sách quân nhân trong dialog
-                for item in tree.get_children():
-                    tree.delete(item)
+                nonlocal all_personnel, selected_ids
                 all_personnel = self.db.get_all()
                 selected_ids = set(unit.personnelIds)
-                for person in all_personnel:
-                    is_selected = person.id in selected_ids
-                    tree.insert('', tk.END, iid=person.id, 
-                               text='✓' if is_selected else '',
-                               values=(person.hoTen or '', person.capBac or '', person.chucVu or ''))
+                filter_text = search_var.get()
+                load_tree_data(filter_text)
             
             edit_window.protocol("WM_DELETE_WINDOW", lambda: [on_edit_close(), edit_window.destroy()])
         
         def save():
-            # Lấy danh sách ID đã chọn
-            selected_personnel_ids = []
+            """Lưu danh sách đã chọn"""
+            # Kiểm tra lại selected_ids từ tree để đảm bảo đồng bộ
+            current_selected = set()
             for item in tree.get_children():
-                if tree.item(item, 'text') == '✓':
-                    selected_personnel_ids.append(item)
+                item_id = tree.item(item, 'tags')[0] if tree.item(item, 'tags') else None
+                if item_id and tree.item(item, 'text') == '✓':
+                    current_selected.add(item_id)
+            
+            # Cập nhật selected_ids với dữ liệu từ tree
+            selected_ids.clear()
+            selected_ids.update(current_selected)
             
             # Cập nhật unit
-            unit.personnelIds = selected_personnel_ids
+            unit.personnelIds = list(selected_ids)
             try:
                 self.db.update_unit(unit)
                 
                 # Cập nhật unitId cho quân nhân
                 all_personnel = self.db.get_all()
                 for person in all_personnel:
-                    if person.id in selected_personnel_ids:
+                    if person.id in selected_ids:
                         person.unitId = unit.id
                     elif person.unitId == unit.id:
                         person.unitId = None
                     self.db.update(person)
                 
                 self.status_label.config(
-                    text=f"✅ Đã cập nhật {len(selected_personnel_ids)} quân nhân vào đơn vị '{unit.ten}'",
+                    text=f"✅ Đã cập nhật {len(selected_ids)} quân nhân vào đơn vị '{unit.ten}'",
                     fg='#4CAF50'
                 )
                 dialog.destroy()
@@ -1545,84 +1657,49 @@ class UnitManagementFrame(tk.Frame):
             except Exception as e:
                 self.status_label.config(text=f"❌ Lỗi: {str(e)}", fg='#F44336')
         
-        # Buttons - Row 2, LUÔN HIỂN THỊ, DÙNG GRID
-        btn_frame = tk.Frame(dialog, bg=self.bg_color, height=80)
-        btn_frame.grid(row=2, column=0, padx=15, pady=15, sticky=tk.EW)
-        btn_frame.grid_propagate(False)  # Không cho phép frame co lại
-        btn_frame.grid_columnconfigure(1, weight=1)  # Spacer column
+        # Buttons - Row 1, LUÔN HIỂN THỊ
+        btn_frame = tk.Frame(dialog, bg='#FAFAFA', height=70)
+        btn_frame.grid(row=1, column=0, padx=10, pady=10, sticky=tk.EW)
+        btn_frame.grid_propagate(False)
+        btn_frame.grid_columnconfigure(1, weight=1)
         
-        # Nút Sửa Quân Nhân - Column 0
-        tk.Button(
-            btn_frame,
-            text="✏️ Sửa Quân Nhân",
-            command=edit_selected_personnel,
-            font=('Segoe UI', 10),
-            bg='#FF9800',
-            fg='white',
-            relief=tk.FLAT,
-            padx=15,
-            pady=6,
-            cursor='hand2'
-        ).grid(row=0, column=0, padx=5, sticky=tk.W)
-        
-        # Spacer - Column 1
-        tk.Frame(btn_frame, bg=self.bg_color).grid(row=0, column=1, sticky=tk.EW)
-        
-        # Nút Hủy - Column 2
+        # Nút Hủy
         tk.Button(
             btn_frame,
             text="❌ Hủy",
             command=dialog.destroy,
-            font=('Segoe UI', 11),
+            font=('Segoe UI', 10),
             bg='#757575',
             fg='white',
             relief=tk.FLAT,
-            padx=25,
+            padx=20,
             pady=8,
             cursor='hand2',
             width=10
-        ).grid(row=0, column=2, padx=5, sticky=tk.E)
+        ).grid(row=0, column=0, padx=5, sticky=tk.W)
         
-        # Nút XONG - Column 3, NỔI BẬT NHẤT - LUÔN HIỂN THỊ
-        hoan_tat_btn = tk.Button(
+        # Spacer
+        tk.Frame(btn_frame, bg='#FAFAFA').grid(row=0, column=1, sticky=tk.EW)
+        
+        # Nút XONG
+        tk.Button(
             btn_frame,
             text="✅ XONG",
             command=save,
-            font=('Segoe UI', 16, 'bold'),
+            font=('Segoe UI', 11, 'bold'),
             bg='#4CAF50',
             fg='white',
             relief=tk.RAISED,
-            padx=50,
-            pady=15,
+            padx=25,
+            pady=8,
             cursor='hand2',
-            width=18,
-            bd=4
-        )
-        hoan_tat_btn.grid(row=0, column=3, padx=10, sticky=tk.E)
+            width=12,
+            bd=2
+        ).grid(row=0, column=2, padx=5, sticky=tk.E)
         
-        # Đảm bảo dialog có đủ không gian và nút luôn hiển thị
+        # Đảm bảo dialog có đủ không gian
         dialog.update_idletasks()
-        dialog.minsize(750, 600)
-        
-        # Force focus vào dialog và đảm bảo nút hiển thị
-        dialog.focus_set()
-        dialog.grab_set()
-        
-        # Đảm bảo nút hiển thị sau khi dialog render xong
-        def ensure_buttons_visible():
-            dialog.update_idletasks()
-            try:
-                btn_frame.update_idletasks()
-                hoan_tat_btn.update_idletasks()
-                # Force nút hiển thị và đảm bảo row 2 không bị ẩn
-                btn_frame.grid(row=2, column=0, padx=15, pady=15, sticky=tk.EW)
-                hoan_tat_btn.lift()
-            except:
-                pass
-        
-        dialog.after(50, ensure_buttons_visible)
-        dialog.after(200, ensure_buttons_visible)
-        dialog.after(500, ensure_buttons_visible)
+        dialog.minsize(1100, 700)
     
     def add_to_to_unit(self):
         """Thêm tổ vào đơn vị đã chọn"""
@@ -1701,10 +1778,46 @@ class UnitManagementFrame(tk.Frame):
             messagebox.showwarning("Cảnh báo", f"Đơn vị '{unit.ten}' chưa có tổ nào")
             return
         
-        # Thu thập tất cả quân nhân từ các tổ
+        # Thu thập tất cả quân nhân từ các tổ và sắp xếp theo cấp bậc
+        def _parse_cap_bac_rank(cap_bac: str) -> int:
+            """Parse cấp bậc thành số để so sánh"""
+            if not cap_bac:
+                return 0
+            cap_bac = cap_bac.strip().upper()
+            if 'ĐẠI TÁ' in cap_bac: return 100
+            elif 'TRUNG TÁ' in cap_bac: return 90
+            elif 'THIẾU TÁ' in cap_bac: return 80
+            elif 'ĐẠI ÚY' in cap_bac: return 70
+            elif 'THƯỢNG ÚY' in cap_bac: return 60
+            elif 'TRUNG ÚY' in cap_bac: return 50
+            elif 'THIẾU ÚY' in cap_bac: return 40
+            elif 'THƯỢNG SĨ' in cap_bac: return 30
+            elif 'TRUNG SĨ' in cap_bac: return 20
+            elif 'HẠ SĨ' in cap_bac: return 10
+            elif cap_bac.startswith('H'):
+                try:
+                    return int(cap_bac[1:])
+                except:
+                    return 0
+            else:
+                try:
+                    return int(cap_bac) + 10
+                except:
+                    return 0
+        
+        def _sort_personnel_by_cap_bac(personnel_list):
+            """Sắp xếp danh sách quân nhân theo cấp bậc (từ cao xuống thấp)"""
+            def sort_key(personnel):
+                cap_bac_rank = _parse_cap_bac_rank(personnel.capBac or '')
+                ho_ten = (personnel.hoTen or '').lower()
+                return (-cap_bac_rank, ho_ten)
+            return sorted(personnel_list, key=sort_key)
+        
         all_personnel_data = []
         for child_unit in child_units:
             personnel_list = self.db.get_personnel_by_unit(child_unit.id)
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            personnel_list = _sort_personnel_by_cap_bac(personnel_list)
             all_personnel_data.append({
                 'to': child_unit,
                 'personnel': personnel_list

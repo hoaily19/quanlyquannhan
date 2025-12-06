@@ -733,6 +733,18 @@ class PersonnelFormFrame(tk.Frame):
         try:
             cd_cu_value = self.cd_cu_var.get()
             dang_phai_phan_dong_value = self.dang_phai_phan_dong_var.get()
+            # Gửi thông báo Discord
+            try:
+                from services.discord_bot import get_discord_bot
+                discord_bot = get_discord_bot()
+                if self.is_new:
+                    discord_bot.notify_personnel_added(self.personnel.hoTen)
+                else:
+                    discord_bot.notify_personnel_updated(self.personnel.hoTen)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Lỗi khi gửi thông báo Discord: {str(e)}")
+            
             if self.is_new:
                 self.db.create(self.personnel)
                 messagebox.showinfo("Thành công", f"Đã thêm quân nhân: {self.personnel.hoTen}")

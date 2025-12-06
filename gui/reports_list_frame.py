@@ -65,6 +65,135 @@ class ReportsListFrame(tk.Frame):
         except:
             pass
     
+    def _add_search_toolbar(self, parent, get_data_func, tree_ref, get_id_func=None):
+        """
+        Thêm toolbar tìm kiếm vào parent frame
+        
+        Args:
+            parent: Parent widget để thêm search toolbar
+            get_data_func: Hàm lấy dữ liệu gốc
+            tree_ref: List chứa tree reference [tree] hoặc None nếu chưa tạo tree
+            get_id_func: Hàm lấy ID (optional)
+        
+        Returns:
+            get_filtered_data: Hàm trả về dữ liệu đã lọc
+        """
+        # Toolbar tìm kiếm
+        search_toolbar = tk.Frame(parent, bg=self.bg_color)
+        search_toolbar.pack(fill=tk.X, padx=10, pady=(5, 5))
+        
+        tk.Label(
+            search_toolbar,
+            text="🔍 Tìm kiếm:",
+            font=('Segoe UI', 10, 'bold'),
+            bg=self.bg_color,
+            fg='#388E3C'
+        ).pack(side=tk.LEFT, padx=5)
+        
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(
+            search_toolbar,
+            textvariable=search_var,
+            width=40,
+            font=('Segoe UI', 10),
+            relief=tk.SOLID,
+            bd=1,
+            highlightthickness=1,
+            highlightcolor='#4CAF50',
+            highlightbackground='#CCCCCC'
+        )
+        search_entry.pack(side=tk.LEFT, padx=5)
+        
+        # Hàm lọc dữ liệu
+        original_get_data = get_data_func
+        
+        def get_filtered_data():
+            data = original_get_data()
+            search_text = search_var.get().strip().lower()
+            if not search_text:
+                return data
+            filtered = []
+            for item in data:
+                # Tìm kiếm trong tất cả các cột
+                if isinstance(item, dict):
+                    searchable_text = ' '.join(str(v) for v in item.get('values', [])).lower()
+                else:
+                    searchable_text = ' '.join(str(v) for v in item).lower()
+                if search_text in searchable_text:
+                    filtered.append(item)
+            return filtered
+        
+        def on_search_change(*args):
+            tree = tree_ref[0] if tree_ref and len(tree_ref) > 0 else None
+            if tree:
+                self.refresh_list(get_filtered_data, tree, get_id_func)
+        
+        search_var.trace('w', on_search_change)
+        
+        return get_filtered_data
+    
+    def _parse_cap_bac_rank(self, cap_bac: str) -> int:
+        """
+        Parse cấp bậc thành số để so sánh
+        Thứ tự từ cao xuống thấp:
+        Đại tá (100) > Trung tá (90) > Thiếu tá (80) > Đại úy (70) > Thượng úy (60) > 
+        Trung úy (50) > Thiếu úy (40) > Thượng sĩ (30) > Trung sĩ (20) > Hạ sĩ (10) > 
+        H3 (3) > H2 (2) > H1 (1) > 4 (4) > 3 (3) > 2 (2) > 1 (1)
+        """
+        if not cap_bac:
+            return 0
+        
+        cap_bac = cap_bac.strip().upper()
+        
+        # Sĩ quan
+        if 'ĐẠI TÁ' in cap_bac or 'ĐẠI TÁ' == cap_bac:
+            return 100
+        elif 'TRUNG TÁ' in cap_bac or 'TRUNG TÁ' == cap_bac:
+            return 90
+        elif 'THIẾU TÁ' in cap_bac or 'THIẾU TÁ' == cap_bac:
+            return 80
+        elif 'ĐẠI ÚY' in cap_bac or 'ĐẠI ÚY' == cap_bac:
+            return 70
+        elif 'THƯỢNG ÚY' in cap_bac or 'THƯỢNG ÚY' == cap_bac:
+            return 60
+        elif 'TRUNG ÚY' in cap_bac or 'TRUNG ÚY' == cap_bac:
+            return 50
+        elif 'THIẾU ÚY' in cap_bac or 'THIẾU ÚY' == cap_bac:
+            return 40
+        # Hạ sĩ quan
+        elif 'THƯỢNG SĨ' in cap_bac or 'THƯỢNG SĨ' == cap_bac:
+            return 30
+        elif 'TRUNG SĨ' in cap_bac or 'TRUNG SĨ' == cap_bac:
+            return 20
+        elif 'HẠ SĨ' in cap_bac or 'HẠ SĨ' == cap_bac:
+            return 10
+        # Binh sĩ - H1, H2, H3
+        elif cap_bac.startswith('H'):
+            try:
+                num = int(cap_bac[1:])
+                return num  # H1=1, H2=2, H3=3
+            except:
+                return 0
+        # Binh sĩ - số thuần
+        else:
+            try:
+                num = int(cap_bac)
+                return num + 10  # 1=11, 2=12, 3=13, 4=14 (cao hơn H1, H2, H3)
+            except:
+                return 0
+    
+    def _sort_personnel_by_cap_bac(self, personnel_list):
+        """
+        Sắp xếp danh sách quân nhân theo cấp bậc (từ cao xuống thấp)
+        Nếu cùng cấp bậc, sắp xếp theo tên
+        """
+        def sort_key(personnel):
+            cap_bac_rank = self._parse_cap_bac_rank(personnel.capBac or '')
+            ho_ten = (personnel.hoTen or '').lower()
+            return (-cap_bac_rank, ho_ten)  # Dấu - để sắp xếp từ cao xuống thấp
+        
+        return sorted(personnel_list, key=sort_key)
+    
     def setup_ui(self):
         """Thiết lập giao diện"""
         self.configure(bg=self.bg_color)
@@ -262,7 +391,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="🔄 Làm Mới",
-            command=lambda: self.refresh_list(get_data_func, tree, get_id_func),
+            command=lambda: self.refresh_list(get_filtered_data, tree, get_id_func),
             font=('Segoe UI', 10),
             bg='#388E3C',
             fg='white',
@@ -276,7 +405,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="📥 Xuất Excel",
-            command=lambda: self.export_excel(get_data_func, title),
+            command=lambda: self.export_excel(get_filtered_data, title),
             font=('Segoe UI', 10),
             bg='#2196F3',
             fg='white',
@@ -291,7 +420,7 @@ class ReportsListFrame(tk.Frame):
         tree.bind('<Button-1>', lambda e: self.on_single_click_select(tree))
         
         # Load data
-        self.refresh_list(get_data_func, tree, get_id_func)
+        self.refresh_list(get_filtered_data, tree, get_id_func)
         
         return tree
     
@@ -753,6 +882,9 @@ class ReportsListFrame(tk.Frame):
         def get_data():
             all_personnel = self.db.get_all()
             
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            all_personnel = self._sort_personnel_by_cap_bac(all_personnel)
+            
             # Cache đơn vị để tránh load nhiều lần
             units_cache = {}
             try:
@@ -871,6 +1003,53 @@ class ReportsListFrame(tk.Frame):
             cursor='hand2'
         ).pack(side=tk.RIGHT, padx=5)
         
+        # Toolbar tìm kiếm
+        search_toolbar = tk.Frame(parent, bg=self.bg_color)
+        search_toolbar.pack(fill=tk.X, padx=10, pady=(5, 5))
+        
+        tk.Label(
+            search_toolbar,
+            text="🔍 Tìm kiếm:",
+            font=('Segoe UI', 10, 'bold'),
+            bg=self.bg_color,
+            fg='#388E3C'
+        ).pack(side=tk.LEFT, padx=5)
+        
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(
+            search_toolbar,
+            textvariable=search_var,
+            width=40,
+            font=('Segoe UI', 10),
+            relief=tk.SOLID,
+            bd=1,
+            highlightthickness=1,
+            highlightcolor='#4CAF50',
+            highlightbackground='#CCCCCC'
+        )
+        search_entry.pack(side=tk.LEFT, padx=5)
+        
+        # Hàm lọc dữ liệu
+        original_get_data = get_data
+        
+        def get_filtered_data():
+            data = original_get_data()
+            search_text = search_var.get().strip().lower()
+            if not search_text:
+                return data
+            filtered = []
+            for item in data:
+                # Tìm kiếm trong tất cả các cột
+                searchable_text = ' '.join(str(v) for v in item['values']).lower()
+                if search_text in searchable_text:
+                    filtered.append(item)
+            return filtered
+        
+        def on_search_change(*args):
+            self.refresh_list(get_filtered_data, tree, None)
+        
+        search_var.trace('w', on_search_change)
+        
         # Tạo treeview với scrollbar ngang
         tree_frame = tk.Frame(parent, bg=self.bg_color)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -941,7 +1120,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="🔄 Làm Mới",
-            command=lambda: self.refresh_list(get_data, tree, None),
+            command=lambda: self.refresh_list(get_filtered_data, tree, None),
             font=('Segoe UI', 10),
             bg='#388E3C',
             fg='white',
@@ -957,7 +1136,7 @@ class ReportsListFrame(tk.Frame):
         tree.bind('<Button-1>', lambda e: self.on_single_click_select(tree))
         
         # Load data
-        self.refresh_list(get_data, tree, None)
+        self.refresh_list(get_filtered_data, tree, None)
     
     def manage_units(self):
         """Mở cửa sổ quản lý đơn vị (chỉ mở một cửa sổ duy nhất)"""  
@@ -1002,9 +1181,14 @@ class ReportsListFrame(tk.Frame):
                 messagebox.showwarning("Cảnh báo", "Không có dữ liệu để xuất!")
                 return
             
-            # Lấy danh sách quân nhân từ IDs
-            personnel_ids = [item['id'] for item in data]
-            personnel_list = [self.db.get_by_id(pid) for pid in personnel_ids if self.db.get_by_id(pid)]
+            # Lấy danh sách quân nhân từ IDs - giữ nguyên thứ tự từ data (đã sắp xếp)
+            personnel_list = []
+            for item in data:
+                personnel_id = item.get('id')
+                if personnel_id:
+                    personnel = self.db.get_by_id(personnel_id)
+                    if personnel:
+                        personnel_list.append(personnel)
             
             if not personnel_list:
                 messagebox.showwarning("Cảnh báo", "Không có quân nhân để xuất!")
@@ -1122,6 +1306,8 @@ class ReportsListFrame(tk.Frame):
         
         def get_data():
             all_personnel = self.db.get_all()
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            all_personnel = self._sort_personnel_by_cap_bac(all_personnel)
             result = []
             for idx, p in enumerate(all_personnel, 1):
                 # Tính tuổi
@@ -1509,6 +1695,10 @@ class ReportsListFrame(tk.Frame):
             )
             title_label.pack(side=tk.LEFT, padx=10)
         
+        # Thêm search toolbar - tạo tree_ref list để có thể cập nhật sau
+        tree_ref = [None]
+        get_filtered_data = self._add_search_toolbar(parent, get_data_func, tree_ref, get_id_func)
+        
         # Treeview
         tree_frame = tk.Frame(parent, bg=self.bg_color)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -1519,6 +1709,9 @@ class ReportsListFrame(tk.Frame):
         tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
                            yscrollcommand=scrollbar_y.set,
                            xscrollcommand=scrollbar_x.set)
+        
+        # Cập nhật tree_ref
+        tree_ref[0] = tree
         
         scrollbar_y.config(command=tree.yview)
         scrollbar_x.config(command=tree.xview)
@@ -1614,7 +1807,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="🔄 Làm Mới",
-            command=lambda: self.refresh_list(get_data_func, tree, get_id_func),
+            command=lambda: self.refresh_list(get_filtered_data, tree, get_id_func),
             font=('Segoe UI', 10),
             bg='#388E3C',
             fg='white',
@@ -1628,7 +1821,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="📊 Xuất Excel",
-            command=lambda: self.export_excel(get_data_func, title),
+            command=lambda: self.export_excel(get_filtered_data, title),
             font=('Segoe UI', 10),
             bg='#2196F3',
             fg='white',
@@ -1642,7 +1835,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="📄 Xuất Word",
-            command=lambda: self.export_vi_tri_can_bo_word(get_data_func),
+            command=lambda: self.export_vi_tri_can_bo_word(get_filtered_data),
             font=('Segoe UI', 10),
             bg='#4CAF50',
             fg='white',
@@ -1657,7 +1850,7 @@ class ReportsListFrame(tk.Frame):
         tree.bind('<Button-1>', lambda e: self.on_single_click_select(tree))
         
         # Load data
-        self.refresh_list(get_data_func, tree, get_id_func)
+        self.refresh_list(get_filtered_data, tree, get_id_func)
     
     def create_dang_vien_dien_tap_tab(self, parent):
         """Tab Đảng viên tham gia diễn tập năm 2025"""
@@ -1670,6 +1863,9 @@ class ReportsListFrame(tk.Frame):
             selected_ids = set(self.db.get_dang_vien_dien_tap())
             all_personnel = self.db.get_all()
             filtered_personnel = [p for p in all_personnel if p.id in selected_ids]
+            
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            filtered_personnel = self._sort_personnel_by_cap_bac(filtered_personnel)
             
             result = []
             for idx, p in enumerate(filtered_personnel, 1):
@@ -1712,6 +1908,10 @@ class ReportsListFrame(tk.Frame):
         )
         title_label.pack(side=tk.LEFT, padx=10)
         
+        # Thêm search toolbar - tạo tree_ref list để có thể cập nhật sau
+        tree_ref = [None]
+        get_filtered_data = self._add_search_toolbar(parent, get_data, tree_ref, None)
+        
         # Buttons toolbar
         btn_container = tk.Frame(toolbar, bg=self.bg_color)
         btn_container.pack(side=tk.RIGHT, padx=5)
@@ -1729,6 +1929,58 @@ class ReportsListFrame(tk.Frame):
             pady=5,
             cursor='hand2'
         ).pack(side=tk.LEFT, padx=3)
+        
+        # Treeview - tạo trước để có thể dùng trong các nút
+        tree_frame = tk.Frame(parent, bg=self.bg_color)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
+        
+        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
+                           yscrollcommand=scrollbar_y.set,
+                           xscrollcommand=scrollbar_x.set)
+        
+        # Cập nhật tree_ref
+        tree_ref[0] = tree
+        
+        scrollbar_y.config(command=tree.yview)
+        scrollbar_x.config(command=tree.xview)
+        
+        # Configure columns
+        for col in columns:
+            tree.heading(col, text=col)
+            if col == 'STT':
+                tree.column(col, width=50, anchor=tk.CENTER)
+            elif col == 'Họ và Tên':
+                tree.column(col, width=200, anchor=tk.W)  # Tăng từ 150 lên 200
+            elif col == 'Ngày Sinh':
+                tree.column(col, width=120, anchor=tk.CENTER)  # Tăng từ 100 lên 120
+            elif col == 'Cấp Bậc/Chức Vụ':
+                tree.column(col, width=150, anchor=tk.CENTER)  # Tăng từ 120 lên 150
+            elif col == 'Đơn Vị':
+                tree.column(col, width=120, anchor=tk.CENTER)  # Tăng từ 80 lên 120
+            elif col == 'Văn Hóa':
+                tree.column(col, width=120, anchor=tk.CENTER)  # Tăng từ 80 lên 120
+            elif col == 'Dân Tộc':
+                tree.column(col, width=130, anchor=tk.W)  # Tăng từ 100 lên 130
+            elif col == 'Tôn Giáo':
+                tree.column(col, width=120, anchor=tk.W)  # Tăng từ 100 lên 120
+            elif col == 'Chức Vụ Đảng':
+                tree.column(col, width=150, anchor=tk.W)  # Tăng từ 120 lên 150
+            elif col == 'Quê Quán/Trú Quán':
+                tree.column(col, width=250, anchor=tk.W)  # Tăng từ 200 lên 250
+            elif col == 'Ghi Chú':
+                tree.column(col, width=200, anchor=tk.W)  # Tăng từ 150 lên 200
+            else:
+                tree.column(col, width=150, anchor=tk.W)
+        
+        # Thêm border cho các hàng
+        self._add_treeview_border(tree)
+        
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
         
         # Nút Chỉnh Sửa
         edit_btn = tk.Button(
@@ -1759,7 +2011,7 @@ class ReportsListFrame(tk.Frame):
             if messagebox.askyesno("Xác nhận", f"Bạn có chắc chắn muốn xóa {ho_ten} khỏi danh sách?"):
                 if self.db.remove_dang_vien_dien_tap(item_id):
                     messagebox.showinfo("Thành công", f"Đã xóa {ho_ten} khỏi danh sách!")
-                    self.refresh_list(get_data, tree, None)
+                    self.refresh_list(get_filtered_data, tree, None)
                 else:
                     messagebox.showerror("Lỗi", "Không thể xóa quân nhân!")
         
@@ -1780,7 +2032,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="🔄 Làm Mới",
-            command=lambda: self.refresh_list(get_data, tree, None),
+            command=lambda: self.refresh_list(get_filtered_data, tree, None),
             font=('Segoe UI', 10),
             bg='#388E3C',
             fg='white',
@@ -1794,7 +2046,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="📥 Xuất Excel",
-            command=lambda: self.export_excel(get_data, "ĐẢNG VIÊN THAM GIA DIỄN TẬP NĂM 2025"),
+            command=lambda: self.export_excel(get_filtered_data, "ĐẢNG VIÊN THAM GIA DIỄN TẬP NĂM 2025"),
             font=('Segoe UI', 10),
             bg='#2196F3',
             fg='white',
@@ -1806,7 +2058,7 @@ class ReportsListFrame(tk.Frame):
         
         # Nút Xuất Word
         def export_word():
-            self.export_dang_vien_dien_tap_word(get_data)
+            self.export_dang_vien_dien_tap_word(get_filtered_data)
         
         tk.Button(
             btn_container,
@@ -1820,52 +2072,6 @@ class ReportsListFrame(tk.Frame):
             pady=5,
             cursor='hand2'
         ).pack(side=tk.LEFT, padx=3)
-        
-        # Treeview
-        tree_frame = tk.Frame(parent, bg=self.bg_color)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
-        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
-        
-        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
-                           yscrollcommand=scrollbar_y.set,
-                           xscrollcommand=scrollbar_x.set)
-        
-        scrollbar_y.config(command=tree.yview)
-        scrollbar_x.config(command=tree.xview)
-        
-        # Configure columns
-        for col in columns:
-            tree.heading(col, text=col)
-            if col == 'STT':
-                tree.column(col, width=50, anchor=tk.CENTER)
-            elif col == 'Họ và Tên':
-                tree.column(col, width=200, anchor=tk.W)  # Tăng từ 150 lên 200
-            elif col == 'Ngày Sinh':
-                tree.column(col, width=120, anchor=tk.CENTER)  # Tăng từ 100 lên 120
-            elif col == 'Cấp Bậc/Chức Vụ':
-                tree.column(col, width=150, anchor=tk.CENTER)  # Tăng từ 120 lên 150
-            elif col == 'Đơn Vị':
-                tree.column(col, width=120, anchor=tk.CENTER)  # Tăng từ 80 lên 120
-            elif col == 'Văn Hóa':
-                tree.column(col, width=120, anchor=tk.CENTER)  # Tăng từ 80 lên 120
-            elif col == 'Dân Tộc':
-                tree.column(col, width=130, anchor=tk.W)  # Tăng từ 100 lên 130
-            elif col == 'Tôn Giáo':
-                tree.column(col, width=130, anchor=tk.W)  # Tăng từ 100 lên 130
-            elif col == 'Chức Vụ Đảng':
-                tree.column(col, width=150, anchor=tk.W)  # Tăng từ 120 lên 150
-            elif col == 'Quê Quán/Trú Quán':
-                tree.column(col, width=300, anchor=tk.W)  # Tăng từ 200 lên 300 để hiển thị đầy đủ
-            elif col == 'Ghi Chú' or col == 'Ghi chú':
-                tree.column(col, width=250, anchor=tk.W)  # Tăng width cho cột ghi chú
-            else:
-                tree.column(col, width=180, anchor=tk.W)  # Tăng từ 150 lên 180
-        
-        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
-        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
         
         # Biến để lưu trữ entry widget đang edit
         editing_cell = {'item': None, 'column': None, 'entry': None, 'buttons': None}
@@ -1961,14 +2167,14 @@ class ReportsListFrame(tk.Frame):
             
             cancel_edit()
             # Refresh lại danh sách
-            self.refresh_list(get_data, tree, None)
+            self.refresh_list(get_filtered_data, tree, None)
         
         # Bind events
         tree.bind('<Double-1>', start_edit)
         tree.bind('<Button-1>', lambda e: (cancel_edit(), self.on_single_click_select(tree)))
         
         # Load data
-        self.refresh_list(get_data, tree, None)
+        self.refresh_list(get_filtered_data, tree, None)
     
     def create_to_3_nguoi_tab(self, parent):
         """Tab Quân nhân có người thân tham gia chế độ cũ"""
@@ -1981,6 +2187,9 @@ class ReportsListFrame(tk.Frame):
             all_personnel = self.db.get_all()
             # Lọc quân nhân có checkbox cdCu được đánh dấu
             filtered_personnel = [p for p in all_personnel if p.thongTinKhac.cdCu]
+            
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            filtered_personnel = self._sort_personnel_by_cap_bac(filtered_personnel)
             
             result = []
             for idx, p in enumerate(filtered_personnel, 1):
@@ -2046,6 +2255,10 @@ class ReportsListFrame(tk.Frame):
                 })
             return result
         
+        # Thêm search toolbar - tạo tree_ref list để có thể cập nhật sau
+        tree_ref = [None]
+        get_filtered_data = self._add_search_toolbar(parent, get_data, tree_ref, None)
+        
         # Tạo view tùy chỉnh với nút Chọn Quân Nhân và Xuất Word
         # Toolbar
         toolbar = tk.Frame(parent, bg=self.bg_color, pady=10)
@@ -2063,6 +2276,40 @@ class ReportsListFrame(tk.Frame):
         # Buttons toolbar
         btn_container = tk.Frame(toolbar, bg=self.bg_color)
         btn_container.pack(side=tk.RIGHT, padx=5)
+        
+        # Treeview - tạo trước để có thể dùng trong các nút
+        tree_frame = tk.Frame(parent, bg=self.bg_color)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
+        
+        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
+                           yscrollcommand=scrollbar_y.set,
+                           xscrollcommand=scrollbar_x.set)
+        
+        # Cập nhật tree_ref
+        tree_ref[0] = tree
+        
+        scrollbar_y.config(command=tree.yview)
+        scrollbar_x.config(command=tree.xview)
+        
+        # Configure columns
+        for col in columns:
+            tree.heading(col, text=col)
+            if col == 'STT':
+                tree.column(col, width=50, anchor=tk.CENTER)
+            elif col == 'Họ và Tên':
+                tree.column(col, width=200, anchor=tk.W)
+            else:
+                tree.column(col, width=150, anchor=tk.W)
+        
+        # Thêm border cho các hàng
+        self._add_treeview_border(tree)
+        
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
         
         # Nút Chỉnh Sửa
         edit_btn = tk.Button(
@@ -2083,7 +2330,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="🔄 Làm Mới",
-            command=lambda: self.refresh_list(get_data, tree, None),
+            command=lambda: self.refresh_list(get_filtered_data, tree, None),
             font=('Segoe UI', 10),
             bg='#388E3C',
             fg='white',
@@ -2097,7 +2344,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="📥 Xuất Excel",
-            command=lambda: self.export_excel(get_data, "DANH SÁCH QUÂN NHÂN CÓ NGƯỜI THÂN THAM GIA CHẾ ĐỘ CŨ"),
+            command=lambda: self.export_excel(get_filtered_data, "DANH SÁCH QUÂN NHÂN CÓ NGƯỜI THÂN THAM GIA CHẾ ĐỘ CŨ"),
             font=('Segoe UI', 10),
             bg='#2196F3',
             fg='white',
@@ -2111,7 +2358,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="📄 Xuất Word",
-            command=lambda: self.export_nguoi_than_che_do_cu_word(get_data),
+            command=lambda: self.export_nguoi_than_che_do_cu_word(get_filtered_data),
             font=('Segoe UI', 10),
             bg='#4CAF50',
             fg='white',
@@ -2120,20 +2367,6 @@ class ReportsListFrame(tk.Frame):
             pady=5,
             cursor='hand2'
         ).pack(side=tk.LEFT, padx=3)
-        
-        # Treeview
-        tree_frame = tk.Frame(parent, bg=self.bg_color)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
-        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
-        
-        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
-                           yscrollcommand=scrollbar_y.set,
-                           xscrollcommand=scrollbar_x.set)
-        
-        scrollbar_y.config(command=tree.yview)
-        scrollbar_x.config(command=tree.xview)
         
         # Configure columns
         for col in columns:
@@ -2175,7 +2408,7 @@ class ReportsListFrame(tk.Frame):
         tree.bind('<Button-1>', lambda e: self.on_single_click_select(tree))
         
         # Load data
-        self.refresh_list(get_data, tree, None)
+        self.refresh_list(get_filtered_data, tree, None)
     
     def create_to_dan_van_tab(self, parent):
         """Tab Tổ công tác dân vận"""
@@ -2187,6 +2420,9 @@ class ReportsListFrame(tk.Frame):
             selected_ids = set(self.db.get_to_dan_van())
             all_personnel = self.db.get_all()
             filtered_personnel = [p for p in all_personnel if p.id in selected_ids]
+            
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            filtered_personnel = self._sort_personnel_by_cap_bac(filtered_personnel)
             
             result = []
             for idx, p in enumerate(filtered_personnel, 1):
@@ -2215,6 +2451,10 @@ class ReportsListFrame(tk.Frame):
                 })
             return result
         
+        # Thêm search toolbar - tạo tree_ref list để có thể cập nhật sau
+        tree_ref = [None]
+        get_filtered_data = self._add_search_toolbar(parent, get_data, tree_ref, None)
+        
         # Toolbar
         toolbar = tk.Frame(parent, bg=self.bg_color, pady=10)
         toolbar.pack(fill=tk.X, padx=10)
@@ -2231,6 +2471,56 @@ class ReportsListFrame(tk.Frame):
         # Buttons toolbar
         btn_container = tk.Frame(toolbar, bg=self.bg_color)
         btn_container.pack(side=tk.RIGHT, padx=5)
+        
+        # Treeview - tạo trước để có thể dùng trong các nút
+        tree_frame = tk.Frame(parent, bg=self.bg_color)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
+        
+        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
+                           yscrollcommand=scrollbar_y.set,
+                           xscrollcommand=scrollbar_x.set)
+        
+        # Cập nhật tree_ref
+        tree_ref[0] = tree
+        
+        scrollbar_y.config(command=tree.yview)
+        scrollbar_x.config(command=tree.xview)
+        
+        # Configure columns
+        for col in columns:
+            tree.heading(col, text=col)
+            if col == 'STT':
+                tree.column(col, width=50, anchor=tk.CENTER)
+            elif col == 'Họ và Tên':
+                tree.column(col, width=150, anchor=tk.W)
+            elif col == 'Cấp Bậc/Chức Vụ':
+                tree.column(col, width=120, anchor=tk.CENTER)
+            elif col == 'Đơn Vị':
+                tree.column(col, width=80, anchor=tk.CENTER)
+            elif col == 'Dân Tộc':
+                tree.column(col, width=100, anchor=tk.W)
+            elif col == 'Tôn Giáo':
+                tree.column(col, width=100, anchor=tk.W)
+            elif col == 'Văn Hóa':
+                tree.column(col, width=100, anchor=tk.CENTER)
+            elif col == 'Ngoại Ngữ':
+                tree.column(col, width=150, anchor=tk.CENTER)  # Tăng từ 100 lên 150
+            elif col == 'Tiếng DTTS':
+                tree.column(col, width=150, anchor=tk.CENTER)  # Tăng từ 100 lên 150
+            elif col == 'Ghi Chú' or col == 'Ghi chú':
+                tree.column(col, width=200, anchor=tk.W)  # Tăng width cho cột ghi chú
+            else:
+                tree.column(col, width=150, anchor=tk.W)
+        
+        # Thêm border cho các hàng
+        self._add_treeview_border(tree)
+        
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
         
         # Nút Chọn Quân Nhân
         tk.Button(
@@ -2276,7 +2566,7 @@ class ReportsListFrame(tk.Frame):
             if messagebox.askyesno("Xác nhận", f"Bạn có chắc chắn muốn xóa {ho_ten} khỏi danh sách tổ công tác dân vận?"):
                 if self.db.remove_to_dan_van(item_id):
                     messagebox.showinfo("Thành công", f"Đã xóa {ho_ten} khỏi danh sách!")
-                    self.refresh_list(get_data, tree, None)
+                    self.refresh_list(get_filtered_data, tree, None)
                 else:
                     messagebox.showerror("Lỗi", "Không thể xóa quân nhân!")
         
@@ -2297,7 +2587,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="🔄 Làm Mới",
-            command=lambda: self.refresh_list(get_data, tree, None),
+            command=lambda: self.refresh_list(get_filtered_data, tree, None),
             font=('Segoe UI', 10),
             bg='#388E3C',
             fg='white',
@@ -2311,7 +2601,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="📥 Xuất Excel",
-            command=lambda: self.export_excel(get_data, "DANH SÁCH TỔ CÔNG TÁC DÂN VẬN"),
+            command=lambda: self.export_excel(get_filtered_data, "DANH SÁCH TỔ CÔNG TÁC DÂN VẬN"),
             font=('Segoe UI', 10),
             bg='#2196F3',
             fg='white',
@@ -2323,7 +2613,7 @@ class ReportsListFrame(tk.Frame):
         
         # Nút Xuất Word
         def export_word():
-            self.export_to_dan_van_word(get_data)
+            self.export_to_dan_van_word(get_filtered_data)
         
         tk.Button(
             btn_container,
@@ -2337,50 +2627,6 @@ class ReportsListFrame(tk.Frame):
             pady=5,
             cursor='hand2'
         ).pack(side=tk.LEFT, padx=3)
-        
-        # Treeview
-        tree_frame = tk.Frame(parent, bg=self.bg_color)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
-        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
-        
-        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
-                           yscrollcommand=scrollbar_y.set,
-                           xscrollcommand=scrollbar_x.set)
-        
-        scrollbar_y.config(command=tree.yview)
-        scrollbar_x.config(command=tree.xview)
-        
-        # Configure columns
-        for col in columns:
-            tree.heading(col, text=col)
-            if col == 'STT':
-                tree.column(col, width=50, anchor=tk.CENTER)
-            elif col == 'Họ và Tên':
-                tree.column(col, width=150, anchor=tk.W)
-            elif col == 'Cấp Bậc/Chức Vụ':
-                tree.column(col, width=120, anchor=tk.CENTER)
-            elif col == 'Đơn Vị':
-                tree.column(col, width=80, anchor=tk.CENTER)
-            elif col == 'Dân Tộc':
-                tree.column(col, width=100, anchor=tk.W)
-            elif col == 'Tôn Giáo':
-                tree.column(col, width=100, anchor=tk.W)
-            elif col == 'Văn Hóa':
-                tree.column(col, width=100, anchor=tk.CENTER)
-            elif col == 'Ngoại Ngữ':
-                tree.column(col, width=150, anchor=tk.CENTER)  # Tăng từ 100 lên 150
-            elif col == 'Tiếng DTTS':
-                tree.column(col, width=150, anchor=tk.CENTER)  # Tăng từ 100 lên 150
-            elif col == 'Ghi Chú' or col == 'Ghi chú':
-                tree.column(col, width=250, anchor=tk.W)  # Tăng từ 150 lên 250 để hiển thị đầy đủ
-            else:
-                tree.column(col, width=180, anchor=tk.W)  # Tăng từ 150 lên 180
-        
-        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
-        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
         
         # Biến để lưu trữ entry widget đang edit
         editing_cell = {'item': None, 'column': None, 'entry': None, 'buttons': None}
@@ -2527,7 +2773,7 @@ class ReportsListFrame(tk.Frame):
                     # Hủy edit trước để tránh conflict
                     cancel_edit()
                     # Refresh lại toàn bộ tree từ database để đảm bảo dữ liệu đồng bộ
-                    self.refresh_list(get_data, tree, None)
+                    self.refresh_list(get_filtered_data, tree, None)
                     messagebox.showinfo("Thành công", "Đã lưu thành công!")
                 else:
                     messagebox.showerror("Lỗi", "Không thể lưu dữ liệu! Có thể cột chưa được tạo trong database.\nVui lòng khởi động lại ứng dụng.")
@@ -2560,7 +2806,7 @@ class ReportsListFrame(tk.Frame):
         tree.bind('<Button-1>', on_click)
         
         # Load data
-        self.refresh_list(get_data, tree, None)
+        self.refresh_list(get_filtered_data, tree, None)
     
     def create_ban_chap_hanh_tab(self, parent):
         """Tab Ban chấp hành Chi đoàn"""
@@ -2576,6 +2822,9 @@ class ReportsListFrame(tk.Frame):
             all_personnel = self.db.get_all()
             # Lọc chỉ những quân nhân trong ban chấp hành
             ban_chap_hanh = [p for p in all_personnel if p.id in ban_chap_hanh_ids]
+            
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            ban_chap_hanh = self._sort_personnel_by_cap_bac(ban_chap_hanh)
             
             result = []
             for idx, p in enumerate(ban_chap_hanh, 1):
@@ -2613,9 +2862,59 @@ class ReportsListFrame(tk.Frame):
         )
         title_label.pack(side=tk.LEFT, padx=10)
         
+        # Thêm search toolbar - tạo tree_ref list để có thể cập nhật sau
+        tree_ref = [None]
+        get_filtered_data = self._add_search_toolbar(parent, get_data, tree_ref, None)
+        
         # Buttons toolbar
         btn_container = tk.Frame(toolbar, bg=self.bg_color)
         btn_container.pack(side=tk.RIGHT, padx=5)
+        
+        # Treeview - tạo trước để có thể dùng trong các nút
+        tree_frame = tk.Frame(parent, bg=self.bg_color)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
+        
+        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
+                           yscrollcommand=scrollbar_y.set,
+                           xscrollcommand=scrollbar_x.set)
+        
+        # Cập nhật tree_ref
+        tree_ref[0] = tree
+        
+        scrollbar_y.config(command=tree.yview)
+        scrollbar_x.config(command=tree.xview)
+        
+        # Configure columns
+        for col in columns:
+            tree.heading(col, text=col)
+            if col == 'STT':
+                tree.column(col, width=50, anchor=tk.CENTER)
+            elif col == 'Họ và Tên':
+                tree.column(col, width=200, anchor=tk.W)
+            elif col == 'Chức Vụ Đoàn':
+                tree.column(col, width=150, anchor=tk.W)
+            else:
+                tree.column(col, width=120, anchor=tk.W)
+        
+        # Thêm border cho các hàng
+        self._add_treeview_border(tree)
+        
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # Load data
+        def refresh_list():
+            tree = tree_ref[0] if tree_ref else None
+            if tree:
+                for item in tree.get_children():
+                    tree.delete(item)
+                data = get_filtered_data()
+                for item_data in data:
+                    tree.insert('', tk.END, values=item_data['values'], tags=(item_data.get('id'),))
         
         # Nút Chọn quân nhân chi đoàn
         def choose_personnel():
@@ -2677,7 +2976,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="🔄 Làm Mới",
-            command=lambda: refresh_list(),
+            command=refresh_list,
             font=('Segoe UI', 10),
             bg='#388E3C',
             fg='white',
@@ -2689,7 +2988,7 @@ class ReportsListFrame(tk.Frame):
         
         # Nút Xuất Word
         def export_word():
-            self.export_ban_chap_hanh_word(parent, get_data)
+            self.export_ban_chap_hanh_word(parent, get_filtered_data)
         
         tk.Button(
             btn_container,
@@ -2704,49 +3003,7 @@ class ReportsListFrame(tk.Frame):
             cursor='hand2'
         ).pack(side=tk.LEFT, padx=3)
         
-        # Treeview
-        tree_frame = tk.Frame(parent, bg=self.bg_color)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
-        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
-        
-        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
-                           yscrollcommand=scrollbar_y.set,
-                           xscrollcommand=scrollbar_x.set)
-        
-        scrollbar_y.config(command=tree.yview)
-        scrollbar_x.config(command=tree.xview)
-        
-        # Configure columns
-        for col in columns:
-            tree.heading(col, text=col)
-            if col == 'STT':
-                tree.column(col, width=50, anchor=tk.CENTER)
-            elif col == 'Họ và Tên':
-                tree.column(col, width=200, anchor=tk.W)
-            elif col == 'Chức Vụ Đoàn':
-                tree.column(col, width=150, anchor=tk.W)
-            else:
-                tree.column(col, width=120, anchor=tk.W)
-        
-        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
-        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
-        
-        # Lưu reference để dùng trong các hàm
-        tree_ref = [tree]
-        
-        # Load data
-        def refresh_list():
-            tree = tree_ref[0] if tree_ref else None
-            if tree:
-                for item in tree.get_children():
-                    tree.delete(item)
-                data = get_data()
-                for item_data in data:
-                    tree.insert('', tk.END, values=item_data['values'], tags=(item_data.get('id'),))
-        
+        # Load data ban đầu
         refresh_list()
     
     def export_ban_chap_hanh_word(self, parent, get_data_func):
@@ -2912,13 +3169,20 @@ class ReportsListFrame(tk.Frame):
         """Dialog chọn quân nhân vào ban chấp hành chi đoàn"""
         dialog = tk.Toplevel(parent)
         dialog.title("Chọn Quân Nhân Chi Đoàn")
-        dialog.geometry("900x600")
+        dialog.geometry("900x650")
         dialog.transient(parent)
         dialog.grab_set()
+        dialog.resizable(True, True)
+        
+        # Dùng grid để control layout tốt hơn
+        dialog.grid_rowconfigure(0, weight=1)  # Row 0 (list_frame) có thể expand
+        dialog.grid_rowconfigure(1, weight=0)  # Row 1 (chuc_vu_frame) không expand
+        dialog.grid_rowconfigure(2, weight=0)  # Row 2 (btn_frame) không expand
+        dialog.grid_columnconfigure(0, weight=1)
         
         # Frame chứa danh sách
         list_frame = tk.Frame(dialog, bg='#FAFAFA')
-        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        list_frame.grid(row=0, column=0, padx=10, pady=10, sticky=tk.NSEW)
         
         # Label
         label = tk.Label(
@@ -2928,6 +3192,16 @@ class ReportsListFrame(tk.Frame):
             bg='#FAFAFA'
         )
         label.pack(anchor=tk.W, pady=5)
+        
+        # Toolbar với tìm kiếm
+        toolbar_frame = tk.Frame(list_frame, bg='#FAFAFA')
+        toolbar_frame.pack(fill=tk.X, pady=5)
+        
+        # Tìm kiếm
+        tk.Label(toolbar_frame, text="🔍 Tìm kiếm:", font=('Segoe UI', 9), bg='#FAFAFA').pack(side=tk.LEFT, padx=5)
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(toolbar_frame, textvariable=search_var, width=30, font=('Segoe UI', 9))
+        search_entry.pack(side=tk.LEFT, padx=5)
         
         # Treeview với checkbox
         columns = ('Họ và Tên', 'Ngày Sinh', 'Cấp Bậc', 'Chức Vụ', 'Đơn Vị', 'Ngày Vào Đoàn')
@@ -2957,22 +3231,72 @@ class ReportsListFrame(tk.Frame):
             is_selected = p.id in ban_chap_hanh_ids
             if is_selected:
                 selected_ids.add(p.id)
+        
+        def load_tree_data():
+            """Load dữ liệu vào tree với filter"""
+            # Xóa dữ liệu cũ
+            for item in tree.get_children():
+                tree.delete(item)
             
-            tree.insert('', tk.END, 
-                       text='✓' if is_selected else '',
-                       values=(
-                           p.hoTen or '',
-                           p.ngaySinh or '',
-                           p.capBac or '',
-                           p.chucVu or '',
-                           p.donVi or '',
-                           p.thongTinKhac.doan.ngayVao or ''
-                       ),
-                       tags=(p.id,))
+            # Lọc theo tìm kiếm
+            search_text = search_var.get().lower()
+            display_personnel = doan_vien
+            if search_text:
+                display_personnel = [p for p in doan_vien 
+                                  if search_text in (p.hoTen or '').lower() or
+                                     search_text in (p.capBac or '').lower() or
+                                     search_text in (p.chucVu or '').lower()]
+            
+            # Sắp xếp theo cấp bậc
+            def _parse_cap_bac_rank(cap_bac: str) -> int:
+                if not cap_bac:
+                    return 0
+                cap_bac = cap_bac.strip().upper()
+                if 'ĐẠI TÁ' in cap_bac: return 100
+                elif 'TRUNG TÁ' in cap_bac: return 90
+                elif 'THIẾU TÁ' in cap_bac: return 80
+                elif 'ĐẠI ÚY' in cap_bac: return 70
+                elif 'THƯỢNG ÚY' in cap_bac: return 60
+                elif 'TRUNG ÚY' in cap_bac: return 50
+                elif 'THIẾU ÚY' in cap_bac: return 40
+                elif 'THƯỢNG SĨ' in cap_bac: return 30
+                elif 'TRUNG SĨ' in cap_bac: return 20
+                elif 'HẠ SĨ' in cap_bac: return 10
+                elif cap_bac.startswith('H'):
+                    try:
+                        return int(cap_bac[1:])
+                    except:
+                        return 0
+                else:
+                    try:
+                        return int(cap_bac) + 10
+                    except:
+                        return 0
+            
+            def sort_key(p):
+                cap_bac_rank = _parse_cap_bac_rank(p.capBac or '')
+                ho_ten = (p.hoTen or '').lower()
+                return (-cap_bac_rank, ho_ten)
+            
+            display_personnel = sorted(display_personnel, key=sort_key)
+            
+            for p in display_personnel:
+                is_selected = p.id in selected_ids
+                tree.insert('', tk.END, 
+                           text='✓' if is_selected else '',
+                           values=(
+                               p.hoTen or '',
+                               p.ngaySinh or '',
+                               p.capBac or '',
+                               p.chucVu or '',
+                               p.donVi or '',
+                               p.thongTinKhac.doan.ngayVao or ''
+                           ),
+                           tags=(p.id,))
         
         # Bind click để toggle
         def toggle_selection(event):
-            item = tree.selection()[0] if tree.selection() else None
+            item = tree.identify_row(event.y)
             if not item:
                 return
             
@@ -2989,13 +3313,17 @@ class ReportsListFrame(tk.Frame):
                 selected_ids.add(item_id)
         
         tree.bind('<Button-1>', toggle_selection)
+        search_var.trace('w', lambda *args: load_tree_data())
         
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Frame chức vụ đoàn
+        # Load dữ liệu ban đầu
+        load_tree_data()
+        
+        # Frame chức vụ đoàn - Row 1
         chuc_vu_frame = tk.Frame(dialog, bg='#FAFAFA')
-        chuc_vu_frame.pack(fill=tk.X, padx=10, pady=5)
+        chuc_vu_frame.grid(row=1, column=0, padx=10, pady=5, sticky=tk.EW)
         
         tk.Label(
             chuc_vu_frame,
@@ -3009,9 +3337,10 @@ class ReportsListFrame(tk.Frame):
         chuc_vu_entry.pack(side=tk.LEFT, padx=5)
         chuc_vu_entry.insert(0, "Bí thư, UV, ...")
         
-        # Buttons
-        btn_frame = tk.Frame(dialog, bg='#FAFAFA')
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        # Buttons - Row 2, LUÔN HIỂN THỊ
+        btn_frame = tk.Frame(dialog, bg='#FAFAFA', height=70)
+        btn_frame.grid(row=2, column=0, padx=10, pady=10, sticky=tk.EW)
+        btn_frame.grid_propagate(False)
         
         def save_selection():
             chuc_vu_doan = chuc_vu_var.get().strip()
@@ -3032,7 +3361,7 @@ class ReportsListFrame(tk.Frame):
             
             messagebox.showinfo("Thành công", f"Đã cập nhật {success_count} quân nhân vào ban chấp hành!")
             dialog.destroy()
-            # Refresh lại treeview nếu có reference
+            # Refresh lại danh sách
             if tree_ref and tree_ref[0]:
                 tree = tree_ref[0]
                 # Clear và reload
@@ -3043,6 +3372,39 @@ class ReportsListFrame(tk.Frame):
                 if ban_chap_hanh_ids:
                     all_personnel = self.db.get_all()
                     ban_chap_hanh = [p for p in all_personnel if p.id in ban_chap_hanh_ids]
+                    # Sắp xếp theo cấp bậc
+                    def _parse_cap_bac_rank(cap_bac: str) -> int:
+                        if not cap_bac:
+                            return 0
+                        cap_bac = cap_bac.strip().upper()
+                        if 'ĐẠI TÁ' in cap_bac: return 100
+                        elif 'TRUNG TÁ' in cap_bac: return 90
+                        elif 'THIẾU TÁ' in cap_bac: return 80
+                        elif 'ĐẠI ÚY' in cap_bac: return 70
+                        elif 'THƯỢNG ÚY' in cap_bac: return 60
+                        elif 'TRUNG ÚY' in cap_bac: return 50
+                        elif 'THIẾU ÚY' in cap_bac: return 40
+                        elif 'THƯỢNG SĨ' in cap_bac: return 30
+                        elif 'TRUNG SĨ' in cap_bac: return 20
+                        elif 'HẠ SĨ' in cap_bac: return 10
+                        elif cap_bac.startswith('H'):
+                            try:
+                                return int(cap_bac[1:])
+                            except:
+                                return 0
+                        else:
+                            try:
+                                return int(cap_bac) + 10
+                            except:
+                                return 0
+                    
+                    def sort_key(p):
+                        cap_bac_rank = _parse_cap_bac_rank(p.capBac or '')
+                        ho_ten = (p.hoTen or '').lower()
+                        return (-cap_bac_rank, ho_ten)
+                    
+                    ban_chap_hanh = sorted(ban_chap_hanh, key=sort_key)
+                    
                     for idx, p in enumerate(ban_chap_hanh, 1):
                         chuc_vu_doan = self.db.get_chuc_vu_doan(p.id)
                         if not chuc_vu_doan:
@@ -3061,31 +3423,42 @@ class ReportsListFrame(tk.Frame):
                                    ),
                                    tags=(p.id,))
         
-        tk.Button(
-            btn_frame,
-            text="Lưu",
-            command=save_selection,
-            font=('Segoe UI', 10),
-            bg='#4CAF50',
-            fg='white',
-            relief=tk.FLAT,
-            padx=20,
-            pady=5,
-            cursor='hand2'
-        ).pack(side=tk.RIGHT, padx=5)
+        # Buttons layout với grid
+        btn_frame.grid_columnconfigure(1, weight=1)
         
+        # Nút Hủy
         tk.Button(
             btn_frame,
-            text="Hủy",
+            text="❌ Hủy",
             command=dialog.destroy,
             font=('Segoe UI', 10),
             bg='#757575',
             fg='white',
             relief=tk.FLAT,
             padx=20,
-            pady=5,
-            cursor='hand2'
-        ).pack(side=tk.RIGHT, padx=5)
+            pady=8,
+            cursor='hand2',
+            width=10
+        ).grid(row=0, column=0, padx=5, sticky=tk.W)
+        
+        # Spacer
+        tk.Frame(btn_frame, bg='#FAFAFA').grid(row=0, column=1, sticky=tk.EW)
+        
+        # Nút XONG
+        tk.Button(
+            btn_frame,
+            text="✅ XONG",
+            command=save_selection,
+            font=('Segoe UI', 11, 'bold'),
+            bg='#4CAF50',
+            fg='white',
+            relief=tk.RAISED,
+            padx=25,
+            pady=8,
+            cursor='hand2',
+            width=12,
+            bd=2
+        ).grid(row=0, column=2, padx=5, sticky=tk.E)
     
     def create_tong_hop_tab(self, parent):
         """Tab Tổng hợp số liệu"""
@@ -3147,6 +3520,10 @@ class ReportsListFrame(tk.Frame):
             all_personnel = self.db.get_all()
             # Lọc chỉ có tôn giáo
             ton_giao = [p for p in all_personnel if p.tonGiao and p.tonGiao.strip()]
+            
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            ton_giao = self._sort_personnel_by_cap_bac(ton_giao)
+            
             result = []
             for idx, p in enumerate(ton_giao, 1):
                 result.append({
@@ -3177,26 +3554,13 @@ class ReportsListFrame(tk.Frame):
         )
         title_label.pack(side=tk.LEFT, padx=10)
         
+        # Thêm search toolbar - tạo tree_ref list để có thể cập nhật sau
+        tree_ref = [None]
+        get_filtered_data = self._add_search_toolbar(parent, get_data, tree_ref, None)
+        
         # Buttons toolbar
         btn_container = tk.Frame(toolbar, bg=self.bg_color)
         btn_container.pack(side=tk.RIGHT, padx=5)
-        
-        # Nút Xuất Word
-        def export_word():
-            self.export_ton_giao_word(parent, get_data)
-        
-        tk.Button(
-            btn_container,
-            text="📄 Xuất Word",
-            command=export_word,
-            font=('Segoe UI', 10),
-            bg='#2196F3',
-            fg='white',
-            relief=tk.FLAT,
-            padx=15,
-            pady=5,
-            cursor='hand2'
-        ).pack(side=tk.LEFT, padx=3)
         
         # Treeview
         tree_frame = tk.Frame(parent, bg=self.bg_color)
@@ -3208,6 +3572,9 @@ class ReportsListFrame(tk.Frame):
         tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
                            yscrollcommand=scrollbar_y.set,
                            xscrollcommand=scrollbar_x.set)
+        
+        # Cập nhật tree_ref
+        tree_ref[0] = tree
         
         scrollbar_y.config(command=tree.yview)
         scrollbar_x.config(command=tree.xview)
@@ -3224,14 +3591,39 @@ class ReportsListFrame(tk.Frame):
             else:
                 tree.column(col, width=120, anchor=tk.W)
         
+        # Thêm border cho các hàng
+        self._add_treeview_border(tree)
+        
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
         scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
         
+        # Nút Xuất Word
+        def export_word():
+            self.export_ton_giao_word(parent, get_filtered_data)
+        
+        tk.Button(
+            btn_container,
+            text="📄 Xuất Word",
+            command=export_word,
+            font=('Segoe UI', 10),
+            bg='#2196F3',
+            fg='white',
+            relief=tk.FLAT,
+            padx=15,
+            pady=5,
+            cursor='hand2'
+        ).pack(side=tk.LEFT, padx=3)
+        
         # Load data
-        data = get_data()
-        for item_data in data:
-            tree.insert('', tk.END, values=item_data['values'], tags=(item_data.get('id'),))
+        def refresh_list():
+            for item in tree.get_children():
+                tree.delete(item)
+            data = get_filtered_data()
+            for item_data in data:
+                tree.insert('', tk.END, values=item_data['values'], tags=(item_data.get('id'),))
+        
+        refresh_list()
     
     def export_ton_giao_word(self, parent, get_data_func):
         """Dialog xuất Word cho Quân Nhân Theo Tôn Giáo"""
@@ -3401,6 +3793,9 @@ class ReportsListFrame(tk.Frame):
             all_personnel = self.db.get_all()
             filtered_personnel = [p for p in all_personnel if p.id in selected_ids]
             
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            filtered_personnel = self._sort_personnel_by_cap_bac(filtered_personnel)
+            
             result = []
             stt = 1
             
@@ -3477,9 +3872,51 @@ class ReportsListFrame(tk.Frame):
         )
         title_label.pack(side=tk.LEFT, padx=10)
         
+        # Thêm search toolbar - tạo tree_ref list để có thể cập nhật sau
+        tree_ref = [None]
+        get_filtered_data = self._add_search_toolbar(parent, get_data, tree_ref, None)
+        
         # Buttons toolbar
         btn_container = tk.Frame(toolbar, bg=self.bg_color)
         btn_container.pack(side=tk.RIGHT, padx=5)
+        
+        # Treeview - tạo trước để có thể dùng trong các nút
+        tree_frame = tk.Frame(parent, bg=self.bg_color)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
+        
+        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
+                           yscrollcommand=scrollbar_y.set,
+                           xscrollcommand=scrollbar_x.set)
+        
+        # Cập nhật tree_ref
+        tree_ref[0] = tree
+        
+        scrollbar_y.config(command=tree.yview)
+        scrollbar_x.config(command=tree.xview)
+        
+        # Configure columns
+        for col in columns:
+            tree.heading(col, text=col)
+            if col == 'STT':
+                tree.column(col, width=50, anchor=tk.CENTER)
+            elif col == 'Họ và Tên QN':
+                tree.column(col, width=200, anchor=tk.W)
+            elif col == 'Họ Tên Người Thân':
+                tree.column(col, width=200, anchor=tk.W)
+            elif col == 'Nội Dung':
+                tree.column(col, width=250, anchor=tk.W)
+            else:
+                tree.column(col, width=150, anchor=tk.W)
+        
+        # Thêm border cho các hàng
+        self._add_treeview_border(tree)
+        
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
         
         # Nút Thêm Mới
         tk.Button(
@@ -3514,7 +3951,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="🔄 Làm Mới",
-            command=lambda: self.refresh_list(get_data, tree, None),
+            command=lambda: self.refresh_list(get_filtered_data, tree, None),
             font=('Segoe UI', 10),
             bg='#388E3C',
             fg='white',
@@ -3528,7 +3965,7 @@ class ReportsListFrame(tk.Frame):
         tk.Button(
             btn_container,
             text="📥 Xuất Excel",
-            command=lambda: self.export_excel(get_data, "QUÂN NHÂN CÓ NGƯỜI THÂN THAM GIA ĐẢNG PHÁI PHẢN ĐỘNG"),
+            command=lambda: self.export_excel(get_filtered_data, "QUÂN NHÂN CÓ NGƯỜI THÂN THAM GIA ĐẢNG PHÁI PHẢN ĐỘNG"),
             font=('Segoe UI', 10),
             bg='#2196F3',
             fg='white',
@@ -3540,7 +3977,7 @@ class ReportsListFrame(tk.Frame):
         
         # Nút Xuất Word
         def export_word():
-            self.export_dang_phai_phan_dong_word(get_data)
+            self.export_dang_phai_phan_dong_word(get_filtered_data)
         
         tk.Button(
             btn_container,
@@ -3555,50 +3992,12 @@ class ReportsListFrame(tk.Frame):
             cursor='hand2'
         ).pack(side=tk.LEFT, padx=3)
         
-        # Treeview
-        tree_frame = tk.Frame(parent, bg=self.bg_color)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
-        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
-        
-        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
-                           yscrollcommand=scrollbar_y.set,
-                           xscrollcommand=scrollbar_x.set)
-        
-        scrollbar_y.config(command=tree.yview)
-        scrollbar_x.config(command=tree.xview)
-        
-        # Configure columns
-        for col in columns:
-            tree.heading(col, text=col)
-            if col == 'STT':
-                tree.column(col, width=50, anchor=tk.CENTER)
-            elif col == 'Họ và Tên QN':
-                tree.column(col, width=150, anchor=tk.W)
-            elif col == 'Ngày Sinh':
-                tree.column(col, width=100, anchor=tk.CENTER)
-            elif col == 'Cấp Bậc-Chức Vụ':
-                tree.column(col, width=120, anchor=tk.CENTER)
-            elif col == 'Đơn Vị':
-                tree.column(col, width=80, anchor=tk.CENTER)
-            elif col == 'Họ Tên Người Thân':
-                tree.column(col, width=150, anchor=tk.W)
-            elif col == 'Mối Quan Hệ':
-                tree.column(col, width=100, anchor=tk.W)
-            else:
-                tree.column(col, width=200, anchor=tk.W)
-        
-        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
-        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
-        
         # Bind events
         tree.bind('<Double-1>', lambda e: self.on_double_click_edit(tree, None))
         tree.bind('<Button-1>', lambda e: self.on_single_click_select(tree))
         
         # Load data
-        self.refresh_list(get_data, tree, None)
+        self.refresh_list(get_filtered_data, tree, None)
     
     def create_yeu_to_nuoc_ngoai_tab(self, parent):
         """Tab Yếu tố nước ngoài"""
@@ -3609,6 +4008,10 @@ class ReportsListFrame(tk.Frame):
             all_personnel = self.db.get_all()
             # Lọc chỉ có yếu tố nước ngoài
             yeu_to_nn = [p for p in all_personnel if p.thongTinKhac.yeuToNN]
+            
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            yeu_to_nn = self._sort_personnel_by_cap_bac(yeu_to_nn)
+            
             result = []
             for idx, p in enumerate(yeu_to_nn, 1):
                 result.append({
@@ -3690,6 +4093,9 @@ class ReportsListFrame(tk.Frame):
             all_personnel = self.db.get_all()
             # Lọc chỉ những quân nhân trong bảo vệ an ninh
             bao_ve_personnel = [p for p in all_personnel if p.id in bao_ve_ids]
+            
+            # Sắp xếp theo cấp bậc (từ cao xuống thấp)
+            bao_ve_personnel = self._sort_personnel_by_cap_bac(bao_ve_personnel)
             
             result = []
             for idx, p in enumerate(bao_ve_personnel, 1):
@@ -3826,9 +4232,61 @@ class ReportsListFrame(tk.Frame):
         )
         title_label.pack(side=tk.LEFT, padx=10)
         
+        # Thêm search toolbar - tạo tree_ref list để có thể cập nhật sau
+        tree_ref = [None]
+        get_filtered_data = self._add_search_toolbar(parent, get_data, tree_ref, None)
+        
         # Buttons toolbar
         btn_container = tk.Frame(toolbar, bg=self.bg_color)
         btn_container.pack(side=tk.RIGHT, padx=5)
+        
+        # Treeview - tạo trước để có thể dùng trong các nút
+        tree_frame = tk.Frame(parent, bg=self.bg_color)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
+        
+        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
+                           yscrollcommand=scrollbar_y.set,
+                           xscrollcommand=scrollbar_x.set)
+        
+        # Cập nhật tree_ref
+        tree_ref[0] = tree
+        
+        scrollbar_y.config(command=tree.yview)
+        scrollbar_x.config(command=tree.xview)
+        
+        # Configure columns
+        for col in columns:
+            tree.heading(col, text=col)
+            if col == 'STT':
+                tree.column(col, width=50, anchor=tk.CENTER)
+            elif col == 'Họ và Tên':
+                tree.column(col, width=200, anchor=tk.W)
+            elif col == 'Thông tin người thân':
+                tree.column(col, width=300, anchor=tk.W)
+            elif col == 'Thời gian vào' or col == 'Thời gian ra':
+                tree.column(col, width=120, anchor=tk.CENTER)
+            else:
+                tree.column(col, width=120, anchor=tk.W)
+        
+        # Thêm border cho các hàng
+        self._add_treeview_border(tree)
+        
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # Nút Làm Mới
+        def refresh_list():
+            tree = tree_ref[0] if tree_ref else None
+            if tree:
+                for item in tree.get_children():
+                    tree.delete(item)
+                data = get_filtered_data()
+                for item_data in data:
+                    tree.insert('', tk.END, values=item_data['values'], tags=(item_data.get('id'),))
         
         # Nút Chọn quân nhân
         def choose_personnel():
@@ -3931,20 +4389,10 @@ class ReportsListFrame(tk.Frame):
             cursor='hand2'
         ).pack(side=tk.LEFT, padx=3)
         
-        # Nút Làm Mới
-        def refresh_list():
-            tree = tree_ref[0] if tree_ref else None
-            if tree:
-                for item in tree.get_children():
-                    tree.delete(item)
-                data = get_data()
-                for item_data in data:
-                    tree.insert('', tk.END, values=item_data['values'], tags=(item_data.get('id'),))
-        
         tk.Button(
             btn_container,
             text="🔄 Làm Mới",
-            command=lambda: refresh_list(),
+            command=refresh_list,
             font=('Segoe UI', 10),
             bg='#388E3C',
             fg='white',
@@ -3956,7 +4404,7 @@ class ReportsListFrame(tk.Frame):
         
         # Nút Xuất Word
         def export_word():
-            self.export_bao_ve_an_ninh_word(parent, get_data)
+            self.export_bao_ve_an_ninh_word(parent, get_filtered_data)
         
         tk.Button(
             btn_container,
@@ -3970,38 +4418,6 @@ class ReportsListFrame(tk.Frame):
             pady=5,
             cursor='hand2'
         ).pack(side=tk.LEFT, padx=3)
-        
-        # Treeview
-        tree_frame = tk.Frame(parent, bg=self.bg_color)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
-        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
-        
-        tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
-                           yscrollcommand=scrollbar_y.set,
-                           xscrollcommand=scrollbar_x.set)
-        
-        scrollbar_y.config(command=tree.yview)
-        scrollbar_x.config(command=tree.xview)
-        
-        # Configure columns
-        for col in columns:
-            tree.heading(col, text=col)
-            if col == 'STT':
-                tree.column(col, width=50, anchor=tk.CENTER)
-            elif col == 'Họ và Tên':
-                tree.column(col, width=200, anchor=tk.W)
-            elif col == 'Thông tin người thân':
-                tree.column(col, width=300, anchor=tk.W)
-            elif col == 'Thời gian vào' or col == 'Thời gian ra':
-                tree.column(col, width=120, anchor=tk.CENTER)
-            else:
-                tree.column(col, width=120, anchor=tk.W)
-        
-        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
-        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
         
         # Bind double-click để chỉnh sửa thời gian vào/ra
         def on_double_click(event):
@@ -4029,9 +4445,6 @@ class ReportsListFrame(tk.Frame):
         
         tree.bind('<Double-1>', on_double_click)
         
-        # Lưu reference để dùng trong các hàm
-        tree_ref = [tree]
-        
         # Load data
         refresh_list()
     
@@ -4044,9 +4457,15 @@ class ReportsListFrame(tk.Frame):
         dialog.grab_set()
         dialog.resizable(True, True)
         
+        # Dùng grid để control layout tốt hơn
+        dialog.grid_rowconfigure(0, weight=1)  # Row 0 (list_frame) có thể expand
+        dialog.grid_rowconfigure(1, weight=0)  # Row 1 (time_container) không expand
+        dialog.grid_rowconfigure(2, weight=0)  # Row 2 (btn_frame) không expand
+        dialog.grid_columnconfigure(0, weight=1)
+        
         # Frame chứa danh sách
         list_frame = tk.Frame(dialog, bg='#FAFAFA')
-        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        list_frame.grid(row=0, column=0, padx=10, pady=10, sticky=tk.NSEW)
         
         # Label
         label = tk.Label(
@@ -4412,17 +4831,19 @@ class ReportsListFrame(tk.Frame):
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Frame container cho thời gian vào/ra
-        time_container = tk.Frame(dialog, bg='#FAFAFA')
-        time_container.pack(fill=tk.BOTH, expand=False, padx=10, pady=5)
+        # Frame container cho thời gian vào/ra - Row 1
+        time_container = tk.Frame(dialog, bg='#FAFAFA', height=200)
+        time_container.grid(row=1, column=0, padx=10, pady=5, sticky=tk.EW)
+        time_container.grid_propagate(False)
         
         # Cập nhật frame thời gian ban đầu
         update_time_frame()
         
-        # Buttons - đặt ở cuối dialog, luôn hiển thị
-        btn_frame = tk.Frame(dialog, bg='#FAFAFA', height=60)
-        btn_frame.pack(fill=tk.X, padx=10, pady=(10, 10), side=tk.BOTTOM)
-        btn_frame.pack_propagate(False)  # Giữ chiều cao cố định
+        # Buttons - Row 2, LUÔN HIỂN THỊ
+        btn_frame = tk.Frame(dialog, bg='#FAFAFA', height=70)
+        btn_frame.grid(row=2, column=0, padx=10, pady=10, sticky=tk.EW)
+        btn_frame.grid_propagate(False)
+        btn_frame.grid_columnconfigure(1, weight=1)
         
         def save_selection():
             # Lưu tất cả quân nhân đã chọn với thời gian riêng của từng người
@@ -4444,37 +4865,39 @@ class ReportsListFrame(tk.Frame):
             # Refresh lại tab
             self.create_bao_ve_an_ninh_tab(parent)
         
-        # Nút Lưu - màu xanh lá, nổi bật
-        save_btn = tk.Button(
+        # Nút Hủy
+        tk.Button(
             btn_frame,
-            text="💾 Lưu",
+            text="❌ Hủy",
+            command=dialog.destroy,
+            font=('Segoe UI', 10),
+            bg='#757575',
+            fg='white',
+            relief=tk.FLAT,
+            padx=20,
+            pady=8,
+            cursor='hand2',
+            width=10
+        ).grid(row=0, column=0, padx=5, sticky=tk.W)
+        
+        # Spacer
+        tk.Frame(btn_frame, bg='#FAFAFA').grid(row=0, column=1, sticky=tk.EW)
+        
+        # Nút XONG
+        tk.Button(
+            btn_frame,
+            text="✅ XONG",
             command=save_selection,
             font=('Segoe UI', 11, 'bold'),
             bg='#4CAF50',
             fg='white',
-            relief=tk.FLAT,
-            padx=30,
+            relief=tk.RAISED,
+            padx=25,
             pady=8,
             cursor='hand2',
-            width=12
-        )
-        save_btn.pack(side=tk.RIGHT, padx=10)
-        
-        # Nút Hủy
-        cancel_btn = tk.Button(
-            btn_frame,
-            text="❌ Hủy",
-            command=dialog.destroy,
-            font=('Segoe UI', 11),
-            bg='#757575',
-            fg='white',
-            relief=tk.FLAT,
-            padx=30,
-            pady=8,
-            cursor='hand2',
-            width=12
-        )
-        cancel_btn.pack(side=tk.RIGHT, padx=5)
+            width=12,
+            bd=2
+        ).grid(row=0, column=2, padx=5, sticky=tk.E)
     
     def edit_bao_ve_an_ninh_time(self, parent, personnel_id, ho_ten, thoi_gian_vao, thoi_gian_ra, refresh_callback):
         """Dialog chỉnh sửa thời gian vào/ra cho quân nhân"""
@@ -4979,10 +5402,11 @@ class ReportsListFrame(tk.Frame):
         # Load dữ liệu ban đầu
         load_tree_data()
         
-        # Buttons
-        btn_frame = tk.Frame(dialog, bg='#FAFAFA', height=60)
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
-        btn_frame.pack_propagate(False)
+        # Buttons - Row 1, LUÔN HIỂN THỊ
+        btn_frame = tk.Frame(dialog, bg='#FAFAFA', height=70)
+        btn_frame.grid(row=1, column=0, padx=10, pady=10, sticky=tk.EW)
+        btn_frame.grid_propagate(False)
+        btn_frame.grid_columnconfigure(1, weight=1)
         
         def save_selection():
             """Lưu danh sách đã chọn"""
@@ -5017,37 +5441,39 @@ class ReportsListFrame(tk.Frame):
             # Refresh lại tab
             self.create_to_3_nguoi_tab(parent)
         
-        # Nút Lưu
-        save_btn = tk.Button(
+        # Nút Hủy
+        tk.Button(
             btn_frame,
-            text="💾 Lưu",
+            text="❌ Hủy",
+            command=dialog.destroy,
+            font=('Segoe UI', 10),
+            bg='#757575',
+            fg='white',
+            relief=tk.FLAT,
+            padx=20,
+            pady=8,
+            cursor='hand2',
+            width=10
+        ).grid(row=0, column=0, padx=5, sticky=tk.W)
+        
+        # Spacer
+        tk.Frame(btn_frame, bg='#FAFAFA').grid(row=0, column=1, sticky=tk.EW)
+        
+        # Nút XONG
+        tk.Button(
+            btn_frame,
+            text="✅ XONG",
             command=save_selection,
             font=('Segoe UI', 11, 'bold'),
             bg='#4CAF50',
             fg='white',
-            relief=tk.FLAT,
-            padx=30,
+            relief=tk.RAISED,
+            padx=25,
             pady=8,
             cursor='hand2',
-            width=12
-        )
-        save_btn.pack(side=tk.RIGHT, padx=10)
-        
-        # Nút Hủy
-        cancel_btn = tk.Button(
-            btn_frame,
-            text="❌ Hủy",
-            command=dialog.destroy,
-            font=('Segoe UI', 11),
-            bg='#757575',
-            fg='white',
-            relief=tk.FLAT,
-            padx=30,
-            pady=8,
-            cursor='hand2',
-            width=12
-        )
-        cancel_btn.pack(side=tk.RIGHT, padx=5)
+            width=12,
+            bd=2
+        ).grid(row=0, column=2, padx=5, sticky=tk.E)
     
     def export_nguoi_than_che_do_cu_word(self, get_data_func):
         """Xuất danh sách quân nhân có người thân tham gia chế độ cũ ra Word"""
@@ -5505,9 +5931,14 @@ class ReportsListFrame(tk.Frame):
         dialog.grab_set()
         dialog.resizable(True, True)
         
+        # Dùng grid để control layout tốt hơn
+        dialog.grid_rowconfigure(0, weight=1)  # Row 0 (list_frame) có thể expand
+        dialog.grid_rowconfigure(1, weight=0)  # Row 1 (btn_frame) không expand
+        dialog.grid_columnconfigure(0, weight=1)
+        
         # Frame chứa danh sách
         list_frame = tk.Frame(dialog, bg='#FAFAFA')
-        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        list_frame.grid(row=0, column=0, padx=10, pady=10, sticky=tk.NSEW)
         
         # Label
         label = tk.Label(
@@ -5634,10 +6065,11 @@ class ReportsListFrame(tk.Frame):
         # Load dữ liệu ban đầu
         load_tree_data()
         
-        # Buttons
-        btn_frame = tk.Frame(dialog, bg='#FAFAFA', height=60)
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
-        btn_frame.pack_propagate(False)
+        # Buttons - Row 1, LUÔN HIỂN THỊ
+        btn_frame = tk.Frame(dialog, bg='#FAFAFA', height=70)
+        btn_frame.grid(row=1, column=0, padx=10, pady=10, sticky=tk.EW)
+        btn_frame.grid_propagate(False)
+        btn_frame.grid_columnconfigure(1, weight=1)
         
         def save_selection():
             """Lưu danh sách đã chọn"""
@@ -5668,37 +6100,39 @@ class ReportsListFrame(tk.Frame):
             # Refresh lại tab
             self.create_to_dan_van_tab(parent)
         
-        # Nút Lưu
-        save_btn = tk.Button(
+        # Nút Hủy
+        tk.Button(
             btn_frame,
-            text="💾 Lưu",
+            text="❌ Hủy",
+            command=dialog.destroy,
+            font=('Segoe UI', 10),
+            bg='#757575',
+            fg='white',
+            relief=tk.FLAT,
+            padx=20,
+            pady=8,
+            cursor='hand2',
+            width=10
+        ).grid(row=0, column=0, padx=5, sticky=tk.W)
+        
+        # Spacer
+        tk.Frame(btn_frame, bg='#FAFAFA').grid(row=0, column=1, sticky=tk.EW)
+        
+        # Nút XONG
+        tk.Button(
+            btn_frame,
+            text="✅ XONG",
             command=save_selection,
             font=('Segoe UI', 11, 'bold'),
             bg='#4CAF50',
             fg='white',
-            relief=tk.FLAT,
-            padx=30,
+            relief=tk.RAISED,
+            padx=25,
             pady=8,
             cursor='hand2',
-            width=12
-        )
-        save_btn.pack(side=tk.RIGHT, padx=10)
-        
-        # Nút Hủy
-        cancel_btn = tk.Button(
-            btn_frame,
-            text="❌ Hủy",
-            command=dialog.destroy,
-            font=('Segoe UI', 11),
-            bg='#757575',
-            fg='white',
-            relief=tk.FLAT,
-            padx=30,
-            pady=8,
-            cursor='hand2',
-            width=12
-        )
-        cancel_btn.pack(side=tk.RIGHT, padx=5)
+            width=12,
+            bd=2
+        ).grid(row=0, column=2, padx=5, sticky=tk.E)
     
     def choose_dang_vien_dien_tap_personnel(self, parent):
         """Dialog chọn quân nhân vào danh sách đảng viên diễn tập"""
@@ -5709,9 +6143,14 @@ class ReportsListFrame(tk.Frame):
         dialog.grab_set()
         dialog.resizable(True, True)
         
+        # Dùng grid để control layout tốt hơn
+        dialog.grid_rowconfigure(0, weight=1)  # Row 0 (list_frame) có thể expand
+        dialog.grid_rowconfigure(1, weight=0)  # Row 1 (btn_frame) không expand
+        dialog.grid_columnconfigure(0, weight=1)
+        
         # Frame chứa danh sách
         list_frame = tk.Frame(dialog, bg='#FAFAFA')
-        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        list_frame.grid(row=0, column=0, padx=10, pady=10, sticky=tk.NSEW)
         
         # Label
         label = tk.Label(
@@ -5840,10 +6279,11 @@ class ReportsListFrame(tk.Frame):
         # Load dữ liệu ban đầu
         load_tree_data()
         
-        # Buttons
-        btn_frame = tk.Frame(dialog, bg='#FAFAFA', height=60)
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
-        btn_frame.pack_propagate(False)
+        # Buttons - Row 1, LUÔN HIỂN THỊ
+        btn_frame = tk.Frame(dialog, bg='#FAFAFA', height=70)
+        btn_frame.grid(row=1, column=0, padx=10, pady=10, sticky=tk.EW)
+        btn_frame.grid_propagate(False)
+        btn_frame.grid_columnconfigure(1, weight=1)
         
         def save_selection():
             """Lưu danh sách đã chọn"""
@@ -5874,37 +6314,39 @@ class ReportsListFrame(tk.Frame):
             # Refresh lại tab
             self.create_dang_vien_dien_tap_tab(parent)
         
-        # Nút Lưu
-        save_btn = tk.Button(
+        # Nút Hủy
+        tk.Button(
             btn_frame,
-            text="💾 Lưu",
+            text="❌ Hủy",
+            command=dialog.destroy,
+            font=('Segoe UI', 10),
+            bg='#757575',
+            fg='white',
+            relief=tk.FLAT,
+            padx=20,
+            pady=8,
+            cursor='hand2',
+            width=10
+        ).grid(row=0, column=0, padx=5, sticky=tk.W)
+        
+        # Spacer
+        tk.Frame(btn_frame, bg='#FAFAFA').grid(row=0, column=1, sticky=tk.EW)
+        
+        # Nút XONG
+        tk.Button(
+            btn_frame,
+            text="✅ XONG",
             command=save_selection,
             font=('Segoe UI', 11, 'bold'),
             bg='#4CAF50',
             fg='white',
-            relief=tk.FLAT,
-            padx=30,
+            relief=tk.RAISED,
+            padx=25,
             pady=8,
             cursor='hand2',
-            width=12
-        )
-        save_btn.pack(side=tk.RIGHT, padx=10)
-        
-        # Nút Hủy
-        cancel_btn = tk.Button(
-            btn_frame,
-            text="❌ Hủy",
-            command=dialog.destroy,
-            font=('Segoe UI', 11),
-            bg='#757575',
-            fg='white',
-            relief=tk.FLAT,
-            padx=30,
-            pady=8,
-            cursor='hand2',
-            width=12
-        )
-        cancel_btn.pack(side=tk.RIGHT, padx=5)
+            width=12,
+            bd=2
+        ).grid(row=0, column=2, padx=5, sticky=tk.E)
     
     def export_dang_vien_dien_tap_word(self, get_data_func):
         """Xuất danh sách đảng viên diễn tập ra Word"""

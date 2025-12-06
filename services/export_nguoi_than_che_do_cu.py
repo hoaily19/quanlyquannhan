@@ -381,3 +381,4 @@ def to_word_docx_nguoi_than_che_do_cu(personnel_list: List[Personnel],
     except Exception as e:
         raise Exception(f"Lỗi khi xuất file Word: {str(e)}")
 
+

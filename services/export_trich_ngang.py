@@ -12,6 +12,42 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from models.personnel import Personnel
 
 
+def _parse_cap_bac_rank(cap_bac: str) -> int:
+    """Parse cấp bậc thành số để so sánh"""
+    if not cap_bac:
+        return 0
+    cap_bac = cap_bac.strip().upper()
+    if 'ĐẠI TÁ' in cap_bac: return 100
+    elif 'TRUNG TÁ' in cap_bac: return 90
+    elif 'THIẾU TÁ' in cap_bac: return 80
+    elif 'ĐẠI ÚY' in cap_bac: return 70
+    elif 'THƯỢNG ÚY' in cap_bac: return 60
+    elif 'TRUNG ÚY' in cap_bac: return 50
+    elif 'THIẾU ÚY' in cap_bac: return 40
+    elif 'THƯỢNG SĨ' in cap_bac: return 30
+    elif 'TRUNG SĨ' in cap_bac: return 20
+    elif 'HẠ SĨ' in cap_bac: return 10
+    elif cap_bac.startswith('H'):
+        try:
+            return int(cap_bac[1:])
+        except:
+            return 0
+    else:
+        try:
+            return int(cap_bac) + 10
+        except:
+            return 0
+
+
+def _sort_personnel_by_cap_bac(personnel_list):
+    """Sắp xếp danh sách quân nhân theo cấp bậc (từ cao xuống thấp)"""
+    def sort_key(personnel):
+        cap_bac_rank = _parse_cap_bac_rank(personnel.capBac or '')
+        ho_ten = (personnel.hoTen or '').lower()
+        return (-cap_bac_rank, ho_ten)
+    return sorted(personnel_list, key=sort_key)
+
+
 def to_word_docx_trich_ngang(personnel_list: List[Personnel],
                              tieu_doan: str = "TIỂU ĐOÀN 38",
                              dai_doi: str = "ĐẠI ĐỘI 3",
@@ -213,6 +249,9 @@ def to_word_docx_trich_ngang(personnel_list: List[Personnel],
                 
                 if not personnel_in_unit:
                     continue
+                
+                # Sắp xếp quân nhân theo cấp bậc (từ cao xuống thấp)
+                personnel_in_unit = _sort_personnel_by_cap_bac(personnel_in_unit)
                 
                 # Thêm sub-header row cho đơn vị (merge tất cả 13 cột)
                 header_row = table.add_row()

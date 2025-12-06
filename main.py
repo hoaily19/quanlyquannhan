@@ -22,6 +22,7 @@ class App:
     def __init__(self):
         self.root = tk.Tk()
         self.auth_service = AuthService()
+        self.current_username = ""  # Lưu username khi đăng nhập
         self.setup_window()
         
     def setup_window(self):
@@ -88,8 +89,9 @@ class App:
         login_window = LoginWindow(self.root, self.on_login_success)
         login_window.show()
     
-    def on_login_success(self):
+    def on_login_success(self, username: str = ""):
         """Callback khi đăng nhập thành công"""
+        self.current_username = username  # Lưu username
         # Sử dụng after với delay nhỏ để đảm bảo destroy được thực hiện sau khi callback hoàn thành
         self.root.after(100, self._cleanup_and_show_main)
     
@@ -108,6 +110,9 @@ class App:
             
             # Hiển thị main window
             main_window = MainWindow(self.root)
+            # Truyền username nếu có
+            if hasattr(self, 'current_username'):
+                main_window.current_username = self.current_username
             main_window.show()
         except Exception as e:
             print(f"Lỗi khi chuyển sang main window: {e}")
